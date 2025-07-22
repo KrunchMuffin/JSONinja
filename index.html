@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSONinja - Advanced JSON Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Header with tabs -->
+        <header class="header">
+            <div class="tab-container">
+                <div class="tabs" id="tabs">
+                    <!-- Tabs will be dynamically added here -->
+                </div>
+                <button class="new-tab-btn" id="newTabBtn" title="New Tab (Ctrl+T)">+</button>
+            </div>
+
+            <!-- Search bar -->
+            <div class="search-container" id="searchContainer">
+                <input type="text" id="searchInput" placeholder="Search...">
+                <div class="search-options">
+                    <label>
+                        <input type="radio" name="searchType" value="key" checked> Keys
+                    </label>
+                    <label>
+                        <input type="radio" name="searchType" value="value"> Values
+                    </label>
+                    <label>
+                        <input type="radio" name="searchType" value="both"> Both
+                    </label>
+                </div>
+                <div class="search-controls">
+                    <button id="searchPrev" title="Previous">↑</button>
+                    <button id="searchNext" title="Next">↓</button>
+                    <span id="searchResults">0/0</span>
+                    <button id="closeSearch" title="Close">×</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content area -->
+        <main class="main-content">
+            <!-- Left sidebar with controls -->
+            <aside class="sidebar">
+                <div class="control-section">
+                    <h3>Actions</h3>
+                    <button id="loadFileBtn" class="btn">Load JSON File</button>
+                    <button id="pasteJsonBtn" class="btn">Paste JSON</button>
+                    <button id="validateBtn" class="btn">Validate JSON</button>
+                    <button id="formatBtn" class="btn">Format JSON</button>
+                    <button id="minifyBtn" class="btn">Minify JSON</button>
+                </div>
+
+                <div class="control-section">
+                    <h3>View</h3>
+                    <button id="expandAllBtn" class="btn">Expand All</button>
+                    <button id="collapseAllBtn" class="btn">Collapse All</button>
+                    <label>
+                        <input type="checkbox" id="showLineNumbers" checked> Line Numbers
+                    </label>
+                    <label>
+                        <input type="checkbox" id="wordWrap"> Word Wrap
+                    </label>
+                </div>
+
+                <div class="control-section">
+                    <h3>Quick Settings</h3>
+                    <button id="settingsBtn" class="btn">Open Settings</button>
+                    <label>
+                        <input type="range" id="fontSizeRange" min="10" max="24" value="14">
+                        Font Size: <span id="fontSizeValue">14px</span>
+                    </label>
+                </div>
+            </aside>
+
+            <!-- JSON viewer area -->
+            <section class="viewer-area">
+                <div class="tab-content" id="tabContent">
+                    <!-- Tab content will be dynamically added here -->
+                </div>
+
+                <!-- Welcome message -->
+                <div class="welcome" id="welcome">
+                    <h2>JSONinja - Advanced JSON Viewer</h2>
+                    <p>Load a JSON file or paste JSON content to get started.</p>
+                    <div class="welcome-actions">
+                        <button class="btn-primary" onclick="document.getElementById('loadFileBtn').click()">Load JSON
+                            File</button>
+                        <button class="btn-secondary" onclick="document.getElementById('pasteJsonBtn').click()">Paste
+                            JSON</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Settings Panel -->
+        <div class="settings-overlay" id="settingsOverlay">
+            <div class="settings-panel">
+                <div class="settings-header">
+                    <h2>Settings</h2>
+                    <button id="closeSettings">×</button>
+                </div>
+
+                <div class="settings-content">
+                    <div class="settings-section">
+                        <h3>Appearance</h3>
+
+                        <div class="setting-item">
+                            <label>Theme:</label>
+                            <select id="themeSelect">
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                                <option value="monokai">Monokai</option>
+                                <option value="github">GitHub</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item">
+                            <label>Font Family:</label>
+                            <select id="fontFamilySelect">
+                                <option value="'Fira Code', 'Consolas', monospace">Fira Code</option>
+                                <option value="'Monaco', 'Consolas', monospace">Monaco</option>
+                                <option value="'Source Code Pro', monospace">Source Code Pro</option>
+                                <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                                <option value="'Cascadia Code', monospace">Cascadia Code</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item">
+                            <label>Font Size:</label>
+                            <input type="range" id="settingsFontSize" min="10" max="24" value="14">
+                            <span id="settingsFontSizeValue">14px</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Colors</h3>
+
+                        <div class="color-settings">
+                            <div class="setting-item">
+                                <label>Keys:</label>
+                                <input type="color" id="keyColor" value="#9cdcfe">
+                            </div>
+                            <div class="setting-item">
+                                <label>Strings:</label>
+                                <input type="color" id="stringColor" value="#ce9178">
+                            </div>
+                            <div class="setting-item">
+                                <label>Numbers:</label>
+                                <input type="color" id="numberColor" value="#b5cea8">
+                            </div>
+                            <div class="setting-item">
+                                <label>Booleans:</label>
+                                <input type="color" id="booleanColor" value="#569cd6">
+                            </div>
+                            <div class="setting-item">
+                                <label>Null:</label>
+                                <input type="color" id="nullColor" value="#808080">
+                            </div>
+                            <div class="setting-item">
+                                <label>Brackets:</label>
+                                <input type="color" id="bracketColor" value="#d4d4d4">
+                            </div>
+                            <div class="setting-item">
+                                <label>Objects:</label>
+                                <input type="color" id="objectColor" value="#ffd700">
+                            </div>
+                            <div class="setting-item">
+                                <label>Arrays:</label>
+                                <input type="color" id="arrayColor" value="#ff6b6b">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Behavior</h3>
+
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="autoExpand"> Auto-expand objects
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="showDataTypes" checked> Show data types
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="highlightMatches" checked> Highlight search matches
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>About & Credits</h3>
+                        <div class="credits-section">
+                            <p class="app-info">
+                                <strong>JSONinja - Advanced JSON Viewer</strong><br>
+                                Version 1.0.0<br>
+                                Built with Electron
+                            </p>
+                            <p class="attribution">
+                                Icons provided by <a href="http://www.icons-land.com" target="_blank"
+                                    rel="noopener">Icons-Land</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-footer">
+                    <button id="resetSettings" class="btn-secondary">Reset to Defaults</button>
+                    <button id="saveSettings" class="btn-primary">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- JSON Input Modal -->
+        <div class="modal-overlay" id="jsonInputModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Paste JSON Content</h3>
+                    <button id="closeJsonModal">×</button>
+                </div>
+                <div class="modal-content">
+                    <textarea id="jsonInput" placeholder="Paste your JSON content here..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelJsonInput" class="btn-secondary">Cancel</button>
+                    <button id="loadJsonInput" class="btn-primary">Load JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+
+</html>
