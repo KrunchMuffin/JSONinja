@@ -74,12 +74,12 @@ npm run dev
 
 ### Create Windows .exe
 ```bash
-npm run build-win
+npm run build
 ```
 
 ### Create for all platforms
 ```bash
-npm run build
+npm run build --all
 ```
 
 The built executable will be in the `dist` folder.
