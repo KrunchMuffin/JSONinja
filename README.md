@@ -46,8 +46,9 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 ### Latest Release (v1.2.0)
 
-- **Windows**: [JSONinja.exe](../../releases/latest/download/JSONinja.exe)
-- **Linux**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.2.0.AppImage)
+- **Windows Portable**: [JSONinja.exe](../../releases/latest/download/JSONinja-Portable-v1.2.0-x64.exe)
+- **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.2.0.AppImage)
+- **Others**: [View All Releases](../../releases) 
 
 ### Quick Install
 
