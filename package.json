@@ -5,13 +5,14 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win",
-    "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac",
-    "build-linux": "electron-builder --linux --dir",
-    "build-win-linux": "electron-builder --win --linux",
-    "build-all": "electron-builder --win --mac --linux",
-    "dev": "electron . --dev"
+    "build": "electron-builder",
+    "build-win": "electron-builder --win --publish=never",
+    "build-mac": "electron-builder --mac --publish=never",
+    "build-linux": "electron-builder --linux --publish=never",
+    "build-all": "electron-builder --win --mac --linux --publish=never",
+    "release": "electron-builder --publish=always",
+    "dev": "electron . --dev",
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
     "json",
@@ -21,13 +22,18 @@
   ],
   "author": "DAB Worx",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KrunchMuffin/jsoninja.git"
+  },
+  "homepage": "https://github.com/KrunchMuffin/jsoninja",
   "devDependencies": {
     "electron": "^37",
     "electron-builder": "^26"
   },
   "build": {
     "appId": "com.dabworx.jsoninja",
-    "productName": "JSONinja JSON Viewer",
+    "productName": "JSONinja",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist"
@@ -37,7 +43,17 @@
       "index.html",
       "styles.css",
       "renderer.js",
-      "preload.js"
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/",
+        "to": "assets/",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "win": {
       "target": [
@@ -56,20 +72,22 @@
           ]
         }
       ],
-      "icon": "JSONinja.ico",
-      "artifactName": "JSONinja-Setup-${version}-${arch}.${ext}"
+      "icon": "assets/JSONinja.ico",
+      "artifactName": "${productName}-Setup-v${version}-${arch}.${ext}",
+      "publisherName": "DAB Worx"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-v${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "installerHeaderIcon": "JSONinja.ico",
-      "installerIcon": "JSONinja.ico",
-      "uninstallerIcon": "JSONinja.ico"
-    },
-    "portable": {
-      "artifactName": "JSONinja-Portable-${version}-${arch}.${ext}"
+      "installerHeaderIcon": "assets/JSONinja.ico",
+      "installerIcon": "assets/JSONinja.ico",
+      "uninstallerIcon": "assets/JSONinja.ico",
+      "license": "LICENSE"
     },
     "mac": {
       "target": [
@@ -88,15 +106,18 @@
           ]
         }
       ],
-      "icon": "JSONinja.icns",
+      "icon": "assets/JSONinja.icns",
       "category": "public.app-category.developer-tools",
-      "artifactName": "JSONinja-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-v${version}-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
     },
     "dmg": {
-      "title": "JSONinja JSON Viewer ${version}",
-      "icon": "JSONinja.icns",
-      "background": "build/JSONinja.png",
-      "artifactName": "JSONinja-${version}.${ext}",
+      "title": "${productName} v${version}",
+      "icon": "assets/JSONinja.icns",
+      "artifactName": "${productName}-v${version}.${ext}",
+      "background": "assets/dmg-background.png",
       "contents": [
         {
           "x": 410,
@@ -109,7 +130,11 @@
           "y": 150,
           "type": "file"
         }
-      ]
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     },
     "linux": {
       "target": [
@@ -138,12 +163,21 @@
           ]
         }
       ],
-      "icon": "JSONinja.png",
+      "icon": "assets/JSONinja.png",
       "category": "Development",
-      "artifactName": "JSONinja-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-v${version}-${arch}.${ext}",
+      "description": "Advanced JSON Viewer with multi-tab support and extensive customization",
+      "maintainer": "DAB Worx <support@dabworx.com>"
     },
     "snap": {
-      "summary": "JSONinja - Advanced JSON Viewer with multi-tab support"
+      "summary": "JSONinja - Advanced JSON Viewer with multi-tab support",
+      "grade": "stable",
+      "confinement": "strict"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "KrunchMuffin",
+      "repo": "jsoninja"
     }
   }
 }

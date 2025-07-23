@@ -1,0 +1,240 @@
+# .github/workflows/release.yml
+name: Build and Release
+
+on:
+  # Trigger on version tags
+  push:
+    tags:
+      - 'v*.*.*'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.1.0)'
+        required: true
+        type: string
+
+env:
+  # App configuration
+  APP_NAME: JSONinja
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  # Create the GitHub release first
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Extract changelog for this version
+          if [ -f "CHANGELOG.md" ]; then
+            # Get content between this version and previous version
+            awk '/^## \['"${VERSION#v}"'\]/, /^## \[/ {if(/^## \[/ && NR>1 && !/^## \['"${VERSION#v}"'\]/) exit; if(!/^## \['"${VERSION#v}"'\]/) print}' CHANGELOG.md > release_notes.md
+
+            # If no specific notes found, use a default
+            if [ ! -s release_notes.md ]; then
+              echo "### What's New in ${VERSION}" > release_notes.md
+              echo "" >> release_notes.md
+              echo "See full changelog for details." >> release_notes.md
+            fi
+          else
+            echo "Release ${VERSION}" > release_notes.md
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: ${{ env.APP_NAME }} ${{ steps.get_version.outputs.version }}
+          body_path: release_notes.md
+          draft: true # Keep as draft until all builds complete
+          prerelease: false
+
+  # Build for Windows
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, ia32]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows ${{ matrix.arch }}
+        run: npm run build-win
+        env:
+          ARCH: ${{ matrix.arch }}
+
+      - name: Upload Windows Installer (${{ matrix.arch }})
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-Setup-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.exe
+          asset_name: JSONinja-Setup-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows Portable (${{ matrix.arch }})
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-Portable-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.exe
+          asset_name: JSONinja-Portable-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.exe
+          asset_content_type: application/octet-stream
+
+  # Build for macOS
+  build-macos:
+    needs: create-release
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import Code-Signing Certificates
+        if: env.MACOS_CERTIFICATE != ''
+        uses: Apple-Actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
+          p12-password: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+
+      - name: Build macOS ${{ matrix.arch }}
+        run: npm run build-mac
+        env:
+          ARCH: ${{ matrix.arch }}
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASS: ${{ secrets.APPLE_ID_PASS }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload macOS DMG (${{ matrix.arch }})
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.dmg
+          asset_name: JSONinja-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}.dmg
+          asset_content_type: application/octet-stream
+
+      - name: Upload macOS ZIP (${{ matrix.arch }})
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}-mac.zip
+          asset_name: JSONinja-${{ needs.create-release.outputs.version }}-${{ matrix.arch }}-mac.zip
+          asset_content_type: application/zip
+
+  # Build for Linux
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
+
+      - name: Build Linux
+        run: npm run build-linux
+
+      - name: Upload AppImage
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-${{ needs.create-release.outputs.version }}-x64.AppImage
+          asset_name: JSONinja-${{ needs.create-release.outputs.version }}-x64.AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload DEB package
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-${{ needs.create-release.outputs.version }}-x64.deb
+          asset_name: JSONinja-${{ needs.create-release.outputs.version }}-x64.deb
+          asset_content_type: application/octet-stream
+
+      - name: Upload RPM package
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
+          asset_path: dist/JSONinja-${{ needs.create-release.outputs.version }}-x64.rpm
+          asset_name: JSONinja-${{ needs.create-release.outputs.version }}-x64.rpm
+          asset_content_type: application/octet-stream
+
+  # Finalize release
+  finalize-release:
+    needs: [create-release, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false
+            });
+
+      - name: Notify success
+        run: |
+          echo "🎉 Release ${{ needs.create-release.outputs.version }} has been published!"
+          echo "📦 All platform builds completed successfully"
