@@ -1,6 +1,6 @@
 {
   "name": "jsoninja",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "JSONinja - Advanced JSON Viewer with multi-tab support and extensive customization",
   "main": "main.js",
   "scripts": {
@@ -23,11 +23,12 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^37",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26"
   },
   "build": {
     "appId": "com.dabworx.jsoninja",
-    "productName": "JSONinja - Advanced JSON Viewer",
+    "productName": "JSONinja JSON Viewer",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -55,13 +56,20 @@
           ]
         }
       ],
-      "icon": "JSONinja.ico"
+      "icon": "JSONinja.ico",
+      "artifactName": "JSONinja-Setup-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerHeaderIcon": "JSONinja.ico",
+      "installerIcon": "JSONinja.ico",
+      "uninstallerIcon": "JSONinja.ico"
+    },
+    "portable": {
+      "artifactName": "JSONinja-Portable-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -81,12 +89,14 @@
         }
       ],
       "icon": "JSONinja.icns",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "artifactName": "JSONinja-${version}-${arch}.${ext}"
     },
     "dmg": {
-      "title": "JSONinja - Advanced JSON Viewer",
+      "title": "JSONinja JSON Viewer ${version}",
       "icon": "JSONinja.icns",
       "background": "build/JSONinja.png",
+      "artifactName": "JSONinja-${version}.${ext}",
       "contents": [
         {
           "x": 410,
@@ -129,7 +139,8 @@
         }
       ],
       "icon": "JSONinja.png",
-      "category": "Development"
+      "category": "Development",
+      "artifactName": "JSONinja-${version}-${arch}.${ext}"
     },
     "snap": {
       "summary": "JSONinja - Advanced JSON Viewer with multi-tab support"

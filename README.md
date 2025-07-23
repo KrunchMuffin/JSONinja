@@ -35,6 +35,28 @@ A powerful, customizable JSON viewer built with Electron. Features multi-tab sup
 - `Ctrl/Cmd + ,` - Settings
 - `Esc` - Close dialogs/panels
 
+## 📦 Downloads
+
+### Latest Release (v1.0.0)
+
+- **Windows**: [JSONinja.exe](../../releases/latest/download/JSONinja.exe)
+- **Linux**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.0.0.AppImage)
+
+### Quick Install
+
+**Windows:**
+1. Download and run the installer
+2. Follow the setup wizard
+
+**Linux:**
+1. Download the AppImage
+2. Make executable: `chmod +x JSONinja.AppImage`
+3. Run: `./JSONinja.AppImage`
+
+> 📋 **Note**: macOS builds coming soon! For now, you can build from source.
+
+[View All Releases](../../releases) | [Report Issues](../../issues)
+
 ## Installation & Setup
 
 ### Prerequisites

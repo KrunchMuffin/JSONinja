@@ -30,7 +30,8 @@ class JSONViewer {
                 showDataTypes: true,
                 highlightMatches: true,
                 showLineNumbers: true,
-                wordWrap: false
+                wordWrap: false,
+                rainbowBrackets: false  // Add this new setting
             }
         };
     }
@@ -139,6 +140,12 @@ class JSONViewer {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+
+        // Rainbow Brackets
+        document.getElementById('rainbowBrackets').addEventListener('change', (e) => {
+            this.settings.behavior.rainbowBrackets = e.target.checked;
+            this.updateActiveTabView();
+        });
     }
 
     bindElectronEvents() {
@@ -263,6 +270,7 @@ class JSONViewer {
         });
     }
 
+    // Update the updateContentUI method to include word wrap class
     updateContentUI() {
         const tabContent = document.getElementById('tabContent');
         tabContent.innerHTML = '';
@@ -277,7 +285,9 @@ class JSONViewer {
 
         if (activeTab.jsonData) {
             const viewer = document.createElement('div');
-            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''}`;
+            // Add word-wrap class based on settings
+            const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
+            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
 
             if (this.settings.behavior.showLineNumbers) {
                 const lineNumbers = this.generateLineNumbers(activeTab.content);
@@ -314,6 +324,15 @@ class JSONViewer {
         const indent = '  '.repeat(level);
         const nextIndent = '  '.repeat(level + 1);
 
+        // Function to get bracket class based on level
+        const getBracketClass = (level) => {
+            if (!this.settings.behavior.rainbowBrackets) {
+                return ''; // Use default bracket colors
+            }
+            const bracketLevel = level % 8; // Cycle through 8 colors
+            return ` bracket-level-${bracketLevel}`;
+        };
+
         if (data === null) {
             return `<span class="json-null">null</span>`;
         }
@@ -332,7 +351,7 @@ class JSONViewer {
 
         if (Array.isArray(data)) {
             if (data.length === 0) {
-                return '<span class="json-array-bracket">[]</span>';
+                return `<span class="json-array-bracket${getBracketClass(level)}">[]</span>`;
             }
 
             const items = data.map((item, index) => {
@@ -343,24 +362,25 @@ class JSONViewer {
             const toggleIcon = collapsed ? '▶' : '▼';
             const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
             const nodeId = `node-${Math.random().toString(36).substr(2, 9)}`;
+            const bracketClass = getBracketClass(level);
 
             return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
-                <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
-                    <span class="json-toggle">${toggleIcon}</span>
-                    <span class="json-array-bracket">[</span>
-                    ${this.settings.behavior.showDataTypes ? `<span class="json-type-badge">Array(${data.length})</span>` : ''}
-                </span>
-                <div class="${childrenClass}">
-${items}
-                </div>
-                ${indent}<span class="json-array-bracket">]</span>
-            </div>`;
+            <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
+                <span class="json-toggle">${toggleIcon}</span>
+                <span class="json-array-bracket${bracketClass}">[</span>
+                ${this.settings.behavior.showDataTypes ? `<span class="json-type-badge">Array(${data.length})</span>` : ''}
+            </span>
+            <div class="${childrenClass}">
+                ${items}
+            </div>
+            ${indent}<span class="json-array-bracket${bracketClass}">]</span>
+        </div>`;
         }
 
         if (typeof data === 'object') {
             const keys = Object.keys(data);
             if (keys.length === 0) {
-                return '<span class="json-object-bracket">{}</span>';
+                return `<span class="json-object-bracket${getBracketClass(level)}">{}</span>`;
             }
 
             const items = keys.map(key => {
@@ -371,18 +391,19 @@ ${items}
             const toggleIcon = collapsed ? '▶' : '▼';
             const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
             const nodeId = `node-${Math.random().toString(36).substr(2, 9)}`;
+            const bracketClass = getBracketClass(level);
 
             return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
-                <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
-                    <span class="json-toggle">${toggleIcon}</span>
-                    <span class="json-object-bracket">{</span>
-                    ${this.settings.behavior.showDataTypes ? `<span class="json-type-badge">Object(${keys.length})</span>` : ''}
-                </span>
-                <div class="${childrenClass}">
-${items}
-                </div>
-                ${indent}<span class="json-object-bracket">}</span>
-            </div>`;
+            <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
+                <span class="json-toggle">${toggleIcon}</span>
+                <span class="json-object-bracket${bracketClass}">{</span>
+                ${this.settings.behavior.showDataTypes ? `<span class="json-type-badge">Object(${keys.length})</span>` : ''}
+            </span>
+            <div class="${childrenClass}">
+                ${items}
+            </div>
+            ${indent}<span class="json-object-bracket${bracketClass}">}</span>
+        </div>`;
         }
 
         return String(data);
@@ -751,6 +772,7 @@ ${items}
         document.getElementById('autoExpand').checked = this.settings.behavior.autoExpand;
         document.getElementById('showDataTypes').checked = this.settings.behavior.showDataTypes;
         document.getElementById('highlightMatches').checked = this.settings.behavior.highlightMatches;
+        document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets; // Add this line
     }
 
     async saveSettings() {
@@ -822,6 +844,7 @@ ${items}
         // Update behavior-related UI elements
         document.getElementById('showLineNumbers').checked = this.settings.behavior.showLineNumbers;
         document.getElementById('wordWrap').checked = this.settings.behavior.wordWrap;
+        document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets; // Add this line
 
         this.updateActiveTabView();
     }
