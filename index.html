@@ -59,15 +59,7 @@
                     <h3>View</h3>
                     <button id="expandAllBtn" class="btn">Expand All</button>
                     <button id="collapseAllBtn" class="btn">Collapse All</button>
-                    <label>
-                        <input type="checkbox" id="showLineNumbers" checked> Line Numbers
-                    </label>
-                    <label>
-                        <input type="checkbox" id="wordWrap"> Word Wrap
-                    </label>
-                    <label>
-                        <input type="checkbox" id="rainbowBrackets"> Rainbow Brackets
-                    </label>
+                    <button id="fullscreenBtn" class="btn">Full Screen (F11)</button>
                 </div>
 
                 <div class="control-section">
@@ -76,6 +68,15 @@
                     <label>
                         <input type="range" id="fontSizeRange" min="10" max="24" value="14">
                         Font Size: <span id="fontSizeValue">14px</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="showLineNumbers" checked> Line Numbers
+                    </label>
+                    <label>
+                        <input type="checkbox" id="wordWrap"> Word Wrap
+                    </label>
+                    <label>
+                        <input type="checkbox" id="rainbowBrackets"> Rainbow Brackets
                     </label>
                 </div>
             </aside>
@@ -201,6 +202,21 @@
                             <label>
                                 <input type="checkbox" id="rainbowBrackets"> Rainbow brackets
                             </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="showArrayIndices"> Show array indices ([0], [1], ...)
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="showStringLength"> Show string character count
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label>Character count threshold:</label>
+                            <input type="range" id="stringLengthThreshold" min="10" max="100" value="20">
+                            <span id="stringLengthThresholdValue">20 chars</span>
                         </div>
                     </div>
 

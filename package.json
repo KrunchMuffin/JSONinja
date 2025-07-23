@@ -1,14 +1,14 @@
 {
   "name": "jsoninja",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "JSONinja - Advanced JSON Viewer with multi-tab support and extensive customization",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build-win": "electron-builder --win --publish=never",
-    "build-mac": "electron-builder --mac --publish=never",
-    "build-linux": "electron-builder --linux --publish=never",
+    "build-win": "electron-builder --win",
+    "build-mac": "electron-builder --mac",
+    "build-linux": "electron-builder --linux",
     "build-all": "electron-builder --win --mac --linux --publish=never",
     "release": "electron-builder --publish=always",
     "dev": "electron . --dev",
@@ -20,7 +20,18 @@
     "electron",
     "multi-tab"
   ],
-  "author": "DAB Worx",
+  "author": {"name": "DAB Worx", "email": "support@dabworx.com"},
+  "contributors": [
+    "KrunchMuffin <support@dabworx.com>"
+  ],
+  "bugs": {
+    "url": "https://github.com/KrunchMuffin/jsoninja/issues"
+  },
+  "support": {
+    "email": "support@dabworx.com",
+    "url": "https://github.com/KrunchMuffin/jsoninja/issues"
+  },
+  "changelog": "https://github.com/KrunchMuffin/jsoninja/blob/main/CHANGELOG.md",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -38,6 +49,7 @@
     "directories": {
       "output": "dist"
     },
+    "icon": "JSONinja",
     "files": [
       "main.js",
       "index.html",

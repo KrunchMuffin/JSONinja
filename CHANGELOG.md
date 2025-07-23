@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-07-23
+
+### Added
+- 🔢 **Array Index Display** - Shows `[0]`, `[1]`, `[2]` indices for all array items with optional toggle (default: on)
+- 📏 **String Length Badges** - Character count display for long strings with configurable threshold (default: >20 chars)
+- 🖥️ **Full-Screen Mode** - Toggle with `F11` key or sidebar button to hide UI chrome for maximum JSON viewing space
+- 📁 **Recent Files Menu** - Quick access to last 10 opened files with persistent storage across sessions
+- ⌨️ **Enhanced Keyboard Support** - Added `F11` full-screen toggle to existing keyboard shortcuts
+- ⚙️ **Configurable Settings** - Selectable character count threshold for string length badges
+- 🔄 **State-Preserving Toggles** - Tree expansion state maintained when toggling display options
+
+### Fixed
+- 🔢 **Line Numbers Display** - Fixed line numbers showing in pairs (1 2, 3 4) by adding proper CSS whitespace handling
+- 🖱️ **Click-to-Expand** - Fixed individual JSON node expand/collapse functionality that wasn't working due to CSS selector mismatch
+- 📝 **JSON Property Formatting** - Each key-value pair now displays on separate lines instead of being cramped on single lines
+- 🔗 **Nested Object Commas** - Fixed malformed HTML where commas appeared outside nested object structures
+- 🎛️ **Font Size UI Stability** - Sidebar and settings panels now maintain fixed font sizes, preventing layout overflow when JSON font size increases
+- 🏗️ **Build Configuration** - Added missing icon specification in package.json for proper app icons in built executables
+- ⚠️ **Code Modernization** - Replaced deprecated `substr()` with `slice()` method
+- 🌈 **Rainbow Brackets Sync** - Fixed synchronization between sidebar and settings panel rainbow bracket toggles
+- 🌳 **Tree State Preservation** - Tree no longer collapses when toggling rainbow brackets or other display settings
+
+### Improved
+- 🎨 **Visual Navigation** - Array indices and string lengths make large JSON structures easier to browse
+- 🚀 **Workflow Efficiency** - Recent files menu speeds up access to frequently used JSON files
+- 📺 **Viewing Experience** - Full-screen mode provides distraction-free environment for large data sets
+- 🎛️ **UI Organization** - Cleaner sidebar layout with logical grouping of controls
+- 🔧 **Settings Management** - Better synchronization between quick controls and detailed settings
+
+### Technical Improvements
+- 🎨 **CSS Architecture** - Improved separation between UI font sizes and JSON content font sizes
+- 🔧 **HTML Structure** - Better handling of nested JSON elements with proper div wrapping for consistent line breaks
+- 📐 **Layout Stability** - Added flex constraints to prevent UI elements from growing with content font size changes
+- 🆔 **Deterministic Node IDs** - Tree nodes now use path-based IDs for reliable state preservation
+- 🔄 **Deep Settings Merge** - Proper handling of nested settings when loading from storage
+
 ## [1.1.0] - 2025-07-22
 
 ### Added

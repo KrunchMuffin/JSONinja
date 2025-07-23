@@ -272,10 +272,14 @@ body {
 /* Sidebar */
 .sidebar {
   width: 250px;
+  min-width: 250px;
+  max-width: 300px;
   background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   padding: 16px;
   overflow-y: auto;
+  font-size: 13px; /* Fixed font size for sidebar regardless of JSON viewer font size */
+  flex-shrink: 0;
 }
 
 .control-section {
@@ -346,21 +350,11 @@ body {
   font-size: var(--font-size);
   line-height: var(--line-height);
   background-color: var(--bg-primary);
-  white-space: pre-wrap; /* Add this line */
+  /* white-space: pre-wrap; */
 }
 
 .json-viewer.with-line-numbers {
   position: relative;
-}
-
-.json-viewer.word-wrap .json-content {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.json-viewer:not(.word-wrap) .json-content {
-  white-space: pre;
 }
 
 .line-numbers {
@@ -375,19 +369,35 @@ body {
   font-size: 12px;
   line-height: var(--line-height);
   user-select: none;
+  white-space: pre;
 }
 
 .json-viewer.with-line-numbers .json-content {
-  white-space: pre-wrap; /* This preserves whitespace and line breaks */
-  margin-left: 50px; /* Keep existing margin for line numbers */
-  font-family: var(--font-family);
-  overflow-wrap: break-word; /* Handle long lines gracefully */
+  margin-left: 50px;
 }
 
 /* JSON syntax highlighting */
 .json-key {
   color: var(--json-key);
   font-weight: normal;
+  padding-left: 40px;
+  line-height: 1.5rem;
+}
+
+.json-array-index {
+  color: var(--text-secondary);
+  font-weight: bold;
+  font-size: 0.9em;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.json-length-badge {
+  color: var(--text-secondary);
+  font-size: 0.8em;
+  font-weight: normal;
+  margin-left: 6px;
+  opacity: 0.7;
 }
 
 .json-string {
@@ -445,7 +455,7 @@ body {
   font-weight: bold;
 }
 
-.json-collapsed .json-children {
+.json-children.json-collapsed {
   display: none;
 }
 
@@ -548,9 +558,11 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   width: 600px;
+  max-width: 600px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  font-size: 14px; /* Fixed font size for settings panel regardless of JSON viewer font size */
 }
 
 .settings-header {
@@ -661,9 +673,11 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   width: 600px;
+  max-width: 600px;
   max-height: 70vh;
   display: flex;
   flex-direction: column;
+  font-size: 14px; /* Fixed font size for modal regardless of JSON viewer font size */
 }
 
 .modal-header {
@@ -759,6 +773,20 @@ body {
   color: #f48fb1;
 }
 
+/* Full-screen mode */
+.app-fullscreen .header,
+.app-fullscreen .sidebar {
+  display: none;
+}
+
+.app-fullscreen .main-content {
+  height: 100vh;
+}
+
+.app-fullscreen .viewer-area {
+  padding: 16px;
+}
+
 /* Responsive design */
 @media (max-width: 1024px) {
   .sidebar {
@@ -777,9 +805,6 @@ body {
     max-width: none;
   }
 }
-
-/* Add these rainbow bracket color classes to your styles.css */
-
 /* Rainbow bracket colors - 8 levels that cycle */
 .bracket-level-0 {
   color: #ff6b6b !important; /* Red */

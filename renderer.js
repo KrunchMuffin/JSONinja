@@ -31,7 +31,10 @@ class JSONViewer {
                 highlightMatches: true,
                 showLineNumbers: true,
                 wordWrap: false,
-                rainbowBrackets: false  // Add this new setting
+                rainbowBrackets: false,
+                showStringLength: false,  // Show character count for long strings
+                showArrayIndices: true,   // Show [0], [1] indices for array items
+                stringLengthThreshold: 20 // Character threshold for showing length badges
             }
         };
     }
@@ -59,6 +62,7 @@ class JSONViewer {
         // View controls
         document.getElementById('expandAllBtn').addEventListener('click', () => this.expandAll());
         document.getElementById('collapseAllBtn').addEventListener('click', () => this.collapseAll());
+        document.getElementById('fullscreenBtn').addEventListener('click', () => this.toggleFullscreen());
         document.getElementById('showLineNumbers').addEventListener('change', (e) => {
             this.settings.behavior.showLineNumbers = e.target.checked;
             this.updateActiveTabView();
@@ -132,6 +136,16 @@ class JSONViewer {
         document.getElementById('highlightMatches').addEventListener('change', (e) => {
             this.settings.behavior.highlightMatches = e.target.checked;
         });
+        
+        // Rainbow Brackets (settings panel)
+        const settingsRainbowBrackets = document.querySelector('.settings-panel #rainbowBrackets');
+        if (settingsRainbowBrackets) {
+            settingsRainbowBrackets.addEventListener('change', (e) => {
+                this.settings.behavior.rainbowBrackets = e.target.checked;
+                this.updateActiveTabViewPreservingState();
+                this.updateSettingsUI(); // Sync with sidebar
+            });
+        }
 
         // JSON input modal
         document.getElementById('closeJsonModal').addEventListener('click', () => this.hidePasteModal());
@@ -141,10 +155,35 @@ class JSONViewer {
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
 
-        // Rainbow Brackets
+        // Rainbow Brackets (sidebar)
         document.getElementById('rainbowBrackets').addEventListener('change', (e) => {
             this.settings.behavior.rainbowBrackets = e.target.checked;
-            this.updateActiveTabView();
+            this.updateActiveTabViewPreservingState();
+            this.updateSettingsUI(); // Sync with settings panel
+        });
+
+        // Array Indices (settings panel)
+        document.getElementById('showArrayIndices').addEventListener('change', (e) => {
+            this.settings.behavior.showArrayIndices = e.target.checked;
+            this.updateActiveTabViewPreservingState();
+            this.updateSettingsUI(); // Sync with sidebar
+        });
+
+        // String Length (settings panel)
+        document.getElementById('showStringLength').addEventListener('change', (e) => {
+            this.settings.behavior.showStringLength = e.target.checked;
+            this.updateActiveTabViewPreservingState();
+            this.updateSettingsUI(); // Sync with sidebar
+        });
+
+        // String Length Threshold (settings panel)
+        document.getElementById('stringLengthThreshold').addEventListener('input', (e) => {
+            const threshold = parseInt(e.target.value);
+            this.settings.behavior.stringLengthThreshold = threshold;
+            document.getElementById('stringLengthThresholdValue').textContent = threshold + ' chars';
+            if (this.settings.behavior.showStringLength) {
+                this.updateActiveTabViewPreservingState();
+            }
         });
     }
 
@@ -164,6 +203,13 @@ class JSONViewer {
     }
 
     handleKeyboardShortcuts(e) {
+        // F11 for fullscreen (without ctrl/cmd)
+        if (e.key === 'F11') {
+            e.preventDefault();
+            this.toggleFullscreen();
+            return;
+        }
+        
         if (e.ctrlKey || e.metaKey) {
             switch (e.key) {
                 case 't':
@@ -299,7 +345,7 @@ class JSONViewer {
 
             const jsonContent = document.createElement('div');
             jsonContent.className = 'json-content';
-            jsonContent.innerHTML = this.renderJSON(activeTab.jsonData);
+            jsonContent.innerHTML = this.renderJSON(activeTab.jsonData, 0, true, '');
             viewer.appendChild(jsonContent);
 
             // Status indicator
@@ -320,7 +366,7 @@ class JSONViewer {
         tabContent.appendChild(contentDiv);
     }
 
-    renderJSON(data, level = 0, isRoot = true) {
+    renderJSON(data, level = 0, isRoot = true, path = '') {
         const indent = '  '.repeat(level);
         const nextIndent = '  '.repeat(level + 1);
 
@@ -346,7 +392,10 @@ class JSONViewer {
         }
 
         if (typeof data === 'string') {
-            return `<span class="json-string">"${this.escapeHtml(data)}"</span>`;
+            const charCount = data.length;
+            const lengthBadge = (this.settings.behavior.showStringLength && charCount > this.settings.behavior.stringLengthThreshold) ? 
+                ` <span class="json-length-badge">(${charCount} chars)</span>` : '';
+            return `<span class="json-string">"${this.escapeHtml(data)}"</span>${lengthBadge}`;
         }
 
         if (Array.isArray(data)) {
@@ -355,13 +404,34 @@ class JSONViewer {
             }
 
             const items = data.map((item, index) => {
-                return `${nextIndent}${this.renderJSON(item, level + 1, false)}`;
-            }).join(',\n');
-
+                const itemPath = path ? `${path}[${index}]` : `[${index}]`;
+                const value = this.renderJSON(item, level + 1, false, itemPath);
+                const comma = index < data.length - 1 ? ',' : '';
+                // Only add comma if the value is not a complex object/array (doesn't start with <div)
+                const commaToAdd = value.startsWith('<div') ? '' : comma;
+                
+                if (this.settings.behavior.showArrayIndices) {
+                    if (value.includes('<div class="json-node')) {
+                        // For nested objects/arrays, integrate the index into the expandable line
+                        const indexPrefix = `<span class="json-array-index">[${index}]</span> `;
+                        const modifiedValue = value.replace(
+                            /<span class="json-expandable"/,
+                            `${indexPrefix}<span class="json-expandable"`
+                        );
+                        return `<div>${nextIndent}${modifiedValue}${commaToAdd}</div>`;
+                    } else {
+                        // Simple values - add index
+                        return `<div>${nextIndent}<span class="json-array-index">[${index}]</span> ${value}${commaToAdd}</div>`;
+                    }
+                } else {
+                    // No indices - just show the values
+                    return `<div>${nextIndent}${value}${commaToAdd}</div>`;
+                }
+            }).join('');
             const collapsed = !this.settings.behavior.autoExpand && level > 0;
             const toggleIcon = collapsed ? '▶' : '▼';
             const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
-            const nodeId = `node-${Math.random().toString(36).substr(2, 9)}`;
+            const nodeId = `node-${path || 'root'}`;
             const bracketClass = getBracketClass(level);
 
             return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
@@ -383,14 +453,19 @@ class JSONViewer {
                 return `<span class="json-object-bracket${getBracketClass(level)}">{}</span>`;
             }
 
-            const items = keys.map(key => {
-                return `${nextIndent}<span class="json-key">"${this.escapeHtml(key)}"</span>: ${this.renderJSON(data[key], level + 1, false)}`;
-            }).join(',\n');
+            const items = keys.map((key, index) => {
+                const keyPath = path ? `${path}.${key}` : key;
+                const value = this.renderJSON(data[key], level + 1, false, keyPath);
+                const comma = index < keys.length - 1 ? ',' : '';
+                // Only add comma if the value is not a complex object/array (doesn't start with <div)
+                const commaToAdd = value.startsWith('<div') ? '' : comma;
+                return `<div>${nextIndent}<span class="json-key">"${this.escapeHtml(key)}"</span>: ${value}${commaToAdd}</div>`;
+            }).join('');
 
             const collapsed = !this.settings.behavior.autoExpand && level > 0;
             const toggleIcon = collapsed ? '▶' : '▼';
             const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
-            const nodeId = `node-${Math.random().toString(36).substr(2, 9)}`;
+            const nodeId = `node-${path || 'root'}`;
             const bracketClass = getBracketClass(level);
 
             return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
@@ -557,6 +632,19 @@ class JSONViewer {
         document.querySelectorAll('.json-node:not(.root) .json-toggle').forEach(toggle => {
             toggle.textContent = '▶';
         });
+    }
+
+    toggleFullscreen() {
+        const app = document.getElementById('app');
+        app.classList.toggle('app-fullscreen');
+        
+        // Update button text
+        const btn = document.getElementById('fullscreenBtn');
+        if (app.classList.contains('app-fullscreen')) {
+            btn.textContent = 'Exit Full Screen (F11)';
+        } else {
+            btn.textContent = 'Full Screen (F11)';
+        }
     }
 
     toggleSearch() {
@@ -772,7 +860,24 @@ class JSONViewer {
         document.getElementById('autoExpand').checked = this.settings.behavior.autoExpand;
         document.getElementById('showDataTypes').checked = this.settings.behavior.showDataTypes;
         document.getElementById('highlightMatches').checked = this.settings.behavior.highlightMatches;
-        document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets; // Add this line
+        document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
+        
+        // Sync settings panel checkboxes
+        const settingsArrayIndices = document.getElementById('showArrayIndices');
+        if (settingsArrayIndices) settingsArrayIndices.checked = this.settings.behavior.showArrayIndices;
+        
+        const settingsStringLength = document.getElementById('showStringLength');
+        if (settingsStringLength) settingsStringLength.checked = this.settings.behavior.showStringLength;
+        
+        // Update character count threshold
+        const thresholdSlider = document.getElementById('stringLengthThreshold');
+        const thresholdValue = document.getElementById('stringLengthThresholdValue');
+        if (thresholdSlider) thresholdSlider.value = this.settings.behavior.stringLengthThreshold || 20;
+        if (thresholdValue) thresholdValue.textContent = (this.settings.behavior.stringLengthThreshold || 20) + ' chars';
+        
+        // Sync settings panel rainbow brackets
+        const settingsRainbowBrackets = document.querySelector('.settings-panel #rainbowBrackets');
+        if (settingsRainbowBrackets) settingsRainbowBrackets.checked = this.settings.behavior.rainbowBrackets;
     }
 
     async saveSettings() {
@@ -801,7 +906,15 @@ class JSONViewer {
             }
 
             if (settings) {
-                this.settings = { ...this.getDefaultSettings(), ...settings };
+                // Deep merge to preserve nested behavior settings
+                this.settings = {
+                    ...this.getDefaultSettings(),
+                    ...settings,
+                    behavior: {
+                        ...this.getDefaultSettings().behavior,
+                        ...settings.behavior
+                    }
+                };
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -844,7 +957,7 @@ class JSONViewer {
         // Update behavior-related UI elements
         document.getElementById('showLineNumbers').checked = this.settings.behavior.showLineNumbers;
         document.getElementById('wordWrap').checked = this.settings.behavior.wordWrap;
-        document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets; // Add this line
+        document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
 
         this.updateActiveTabView();
     }
@@ -852,6 +965,50 @@ class JSONViewer {
     updateActiveTabView() {
         if (this.activeTabId) {
             this.updateContentUI();
+        }
+    }
+
+    // Store expansion state before re-rendering
+    saveExpansionState() {
+        const state = {};
+        document.querySelectorAll('.json-node[data-node-id]').forEach(node => {
+            const nodeId = node.getAttribute('data-node-id');
+            const children = node.querySelector('.json-children');
+            state[nodeId] = !children.classList.contains('json-collapsed');
+        });
+        return state;
+    }
+
+    // Restore expansion state after re-rendering
+    restoreExpansionState(state) {
+        // Wait for next tick to ensure DOM is updated
+        setTimeout(() => {
+            Object.keys(state).forEach(nodeId => {
+                const node = document.querySelector(`[data-node-id="${nodeId}"]`);
+                if (node) {
+                    const children = node.querySelector('.json-children');
+                    const toggle = node.querySelector('.json-toggle');
+                    if (children && toggle) {
+                        if (state[nodeId]) {
+                            // Should be expanded
+                            children.classList.remove('json-collapsed');
+                            toggle.textContent = '▼';
+                        } else {
+                            // Should be collapsed
+                            children.classList.add('json-collapsed');
+                            toggle.textContent = '▶';
+                        }
+                    }
+                }
+            });
+        }, 0);
+    }
+
+    updateActiveTabViewPreservingState() {
+        if (this.activeTabId) {
+            const state = this.saveExpansionState();
+            this.updateContentUI();
+            this.restoreExpansionState(state);
         }
     }
 }
