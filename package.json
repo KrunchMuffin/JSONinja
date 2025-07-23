@@ -74,7 +74,6 @@
       ],
       "icon": "assets/JSONinja.ico",
       "artifactName": "${productName}-Setup-v${version}-${arch}.${ext}",
-      "publisherName": "DAB Worx"
     },
     "portable": {
       "artifactName": "${productName}-Portable-v${version}-${arch}.${ext}"
