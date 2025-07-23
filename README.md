@@ -1,23 +1,29 @@
 # JSONinja - Advanced JSON Viewer
 
-A powerful, customizable JSON viewer built with Electron. Features multi-tab support, extensive customization options, and advanced search capabilities.
+A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON structures with ease using array indices, string length indicators, full-screen mode, and advanced customization options.
 
 ## Features
 
 ### 🚀 Core Features
 - **Multi-tab Interface** - Work with multiple JSON files simultaneously
-- **File Operations** - Load JSON files or paste content directly
+- **File Operations** - Load JSON files, paste content, or use recent files menu
 - **Real-time Validation** - Instant JSON syntax validation and error reporting
 - **Format & Minify** - Pretty-print or minify JSON with one click
-- **Search & Navigation** - Powerful search with key/value filtering
-- **Tree View** - Collapsible JSON structure with expand/collapse all
+- **Search & Navigation** - Powerful search with key/value filtering and highlighting
+- **Tree View** - Collapsible JSON structure with state-preserving expand/collapse controls
+- **Array Index Display** - Shows `[0]`, `[1]`, `[2]` indices for easy array navigation (toggleable)
+- **String Length Badges** - Character count display for long strings with configurable threshold
+- **Full-Screen Mode** - Distraction-free viewing with F11 toggle
+- **Recent Files** - Quick access to your last 10 opened JSON files
 
 ### 🎨 Customization
-- **4 Built-in Themes** - Dark, Light, GitHub, and Monokai
-- **Font Customization** - Choose from 5 coding fonts and adjustable sizes
-- **Color Coding** - Customize colors for keys, strings, numbers, booleans, null values, and brackets
-- **Behavior Settings** - Auto-expand, data type badges, line numbers, word wrap
-- **Layout Options** - Resizable sidebar, customizable interface
+- **4 Built-in Themes** - Dark, Light, GitHub, and Monokai with theme-aware rainbow brackets
+- **Font Customization** - Choose from 5 coding fonts (Fira Code, Monaco, Source Code Pro, JetBrains Mono, Cascadia Code) with adjustable sizes
+- **Color Coding** - Individual color controls for keys, strings, numbers, booleans, null values, and brackets
+- **Rainbow Brackets** - 8-color cycling bracket system for visual nesting clarity
+- **Display Options** - Toggle array indices, string length badges, line numbers, word wrap
+- **Smart Settings** - Configurable string length threshold (10-100 characters)
+- **State Preservation** - Tree expansion state maintained when toggling display options
 
 ### 🔍 Advanced Search
 - **Multi-mode Search** - Search keys, values, or both
@@ -33,14 +39,15 @@ A powerful, customizable JSON viewer built with Electron. Features multi-tab sup
 - `Ctrl/Cmd + E` - Expand all
 - `Ctrl/Cmd + Shift + E` - Collapse all
 - `Ctrl/Cmd + ,` - Settings
+- `F11` - Toggle full-screen mode
 - `Esc` - Close dialogs/panels
 
 ## 📦 Downloads
 
-### Latest Release (v1.0.0)
+### Latest Release (v1.2.0)
 
 - **Windows**: [JSONinja.exe](../../releases/latest/download/JSONinja.exe)
-- **Linux**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.0.0.AppImage)
+- **Linux**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.2.0.AppImage)
 
 ### Quick Install
 
@@ -123,6 +130,7 @@ The app uses `electron-builder` for packaging. Key features:
 
 ### Loading JSON Data
 - **From File**: Click "Load JSON File" or use Ctrl+O
+- **Recent Files**: Quick access to your last 10 opened files via menu
 - **Paste**: Click "Paste JSON" and paste your content
 - **Drag & Drop**: Drag JSON files directly onto the application
 
@@ -140,10 +148,14 @@ The app uses `electron-builder` for packaging. Key features:
 4. **Visual Feedback** - Matches are highlighted in yellow, current match in orange
 
 ### View Controls
-- **Expand/Collapse** - Click arrows next to objects/arrays
+- **Expand/Collapse** - Click arrows next to objects/arrays (state preserved when toggling settings)
 - **Expand All** - Ctrl+E expands everything
 - **Collapse All** - Ctrl+Shift+E collapses everything
-- **Line Numbers** - Toggle in sidebar or settings
+- **Array Indices** - Toggle `[0]`, `[1]`, `[2]` display for arrays (default: on)
+- **String Length** - Show character count for long strings with configurable threshold
+- **Rainbow Brackets** - Color-coded bracket nesting with 8-color cycle
+- **Full Screen** - F11 for distraction-free viewing
+- **Line Numbers** - Toggle in quick settings
 - **Word Wrap** - Enable for long lines
 
 ## File Structure
@@ -151,11 +163,14 @@ The app uses `electron-builder` for packaging. Key features:
 ```
 jsoninja/
 ├── package.json          # Project configuration & dependencies
-├── main.js               # Electron main process
+├── main.js               # Electron main process with recent files
 ├── preload.js            # Secure IPC bridge
-├── index.html            # Main application UI
-├── styles.css            # All application styles
-├── renderer.js           # Application logic & functionality
+├── index.html            # Main application UI with new controls
+├── styles.css            # All application styles including themes
+├── renderer.js           # Application logic & state management
+├── CHANGELOG.md          # Version history and features
+├── TODO.md               # Planned features and improvements
+├── CLAUDE.md             # Development context and patterns
 └── README.md            # This file
 ```
 
@@ -180,6 +195,9 @@ The app uses CSS custom properties for theming:
 - `--json-boolean` - Boolean values
 - `--json-null` - Null values
 - `--json-bracket` - Brackets and punctuation
+- `--json-object` - Object bracket colors
+- `--json-array` - Array bracket colors
+- `.bracket-level-0` through `.bracket-level-7` - Rainbow bracket colors
 
 ## Troubleshooting
 
@@ -206,9 +224,11 @@ The app uses CSS custom properties for theming:
 - Restart the application
 
 ### Performance
-- Large JSON files (>10MB) may load slowly
-- Consider using "Collapse All" for better performance
-- Search in large files may take time
+- Handles JSON files up to ~10-20MB (performance depends on structure complexity)
+- Use "Collapse All" and disable array indices for better performance with large files
+- String length badges can be disabled to reduce visual clutter
+- Tree state preservation maintains performance during setting changes
+- Search may be slower on very large files
 
 ### Platform-Specific Notes
 
