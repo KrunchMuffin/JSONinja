@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Added
 - 🌈 **Rainbow Brackets** - Visual nesting enhancement with 8-color cycling bracket system
 - 🎨 Theme-aware rainbow colors that adapt to Dark, Light, GitHub, and Monokai themes
@@ -115,8 +116,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Support & Feedback
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/yourusername/jsoninja/issues)
-- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/yourusername/jsoninja/discussions)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/KrunchMuffin/jsoninja/issues)
+- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/KrunchMuffin/jsoninja/discussions)
 - 📧 **Contact**: support@dabworx.com
 - 🌟 **Reviews**: We'd love your feedback!
 

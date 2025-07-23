@@ -1,6 +1,6 @@
 {
   "name": "jsoninja",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "description": "JSONinja - Advanced JSON Viewer with multi-tab support and extensive customization",
   "main": "main.js",
   "scripts": {
@@ -46,15 +46,6 @@
       "preload.js",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "assets/",
-        "to": "assets/",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "win": {
       "target": [
         {
@@ -72,8 +63,7 @@
           ]
         }
       ],
-      "icon": "assets/JSONinja.ico",
-      "artifactName": "${productName}-Setup-v${version}-${arch}.${ext}",
+      "artifactName": "${productName}-Setup-v${version}-${arch}.${ext}"
     },
     "portable": {
       "artifactName": "${productName}-Portable-v${version}-${arch}.${ext}"
@@ -82,11 +72,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "installerHeaderIcon": "assets/JSONinja.ico",
-      "installerIcon": "assets/JSONinja.ico",
-      "uninstallerIcon": "assets/JSONinja.ico",
-      "license": "LICENSE"
+      "createStartMenuShortcut": true
     },
     "mac": {
       "target": [
@@ -105,18 +91,12 @@
           ]
         }
       ],
-      "icon": "assets/JSONinja.icns",
       "category": "public.app-category.developer-tools",
-      "artifactName": "${productName}-v${version}-${arch}.${ext}",
-      "hardenedRuntime": true,
-      "entitlements": "assets/entitlements.mac.plist",
-      "entitlementsInherit": "assets/entitlements.mac.plist"
+      "artifactName": "${productName}-v${version}-${arch}.${ext}"
     },
     "dmg": {
       "title": "${productName} v${version}",
-      "icon": "assets/JSONinja.icns",
       "artifactName": "${productName}-v${version}.${ext}",
-      "background": "assets/dmg-background.png",
       "contents": [
         {
           "x": 410,
@@ -129,11 +109,7 @@
           "y": 150,
           "type": "file"
         }
-      ],
-      "window": {
-        "width": 540,
-        "height": 380
-      }
+      ]
     },
     "linux": {
       "target": [
@@ -154,29 +130,10 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "snap",
-          "arch": [
-            "x64"
-          ]
         }
       ],
-      "icon": "assets/JSONinja.png",
       "category": "Development",
-      "artifactName": "${productName}-v${version}-${arch}.${ext}",
-      "description": "Advanced JSON Viewer with multi-tab support and extensive customization",
-      "maintainer": "DAB Worx <support@dabworx.com>"
-    },
-    "snap": {
-      "summary": "JSONinja - Advanced JSON Viewer with multi-tab support",
-      "grade": "stable",
-      "confinement": "strict"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "KrunchMuffin",
-      "repo": "jsoninja"
+      "artifactName": "${productName}-v${version}-${arch}.${ext}"
     }
   }
 }
