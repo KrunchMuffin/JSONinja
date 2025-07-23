@@ -5,8 +5,7 @@ All notable changes to JSONinja will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2025-07-22 🎆
-
+## [Unreleased]
 ### Added
 - 🌈 **Rainbow Brackets** - Visual nesting enhancement with 8-color cycling bracket system
 - 🎨 Theme-aware rainbow colors that adapt to Dark, Light, GitHub, and Monokai themes
