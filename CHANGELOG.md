@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-07-22
+
 ### Added
 - 🌈 **Rainbow Brackets** - Visual nesting enhancement with 8-color cycling bracket system
 - 🎨 Theme-aware rainbow colors that adapt to Dark, Light, GitHub, and Monokai themes
