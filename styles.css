@@ -267,6 +267,12 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  transition: margin-top 0.2s ease;
+}
+
+/* Adjust main content when search is active */
+.header:has(.search-container.active) + .main-content {
+  margin-top: 44px; /* Height of search container: input(~27px) + container padding(16px) + border(1px) */
 }
 
 /* Sidebar */
@@ -350,7 +356,8 @@ body {
   font-size: var(--font-size);
   line-height: var(--line-height);
   background-color: var(--bg-primary);
-  /* white-space: pre-wrap; */
+  white-space: nowrap; /* Default: no wrapping */
+  overflow-x: auto;
 }
 
 .json-viewer.with-line-numbers {
@@ -376,6 +383,17 @@ body {
   margin-left: 50px;
 }
 
+/* Word wrap control */
+.json-viewer.word-wrap {
+  white-space: pre-wrap; /* Enable wrapping when class is present */
+  overflow-x: visible;
+}
+
+.json-viewer.word-wrap .json-string,
+.json-viewer.word-wrap .json-key {
+  word-break: break-word; /* Allow long strings to break */
+}
+
 /* JSON syntax highlighting */
 .json-key {
   color: var(--json-key);
@@ -392,12 +410,27 @@ body {
   display: inline-block;
 }
 
+.json-children {
+  padding-left: 0; /* Remove CSS padding - JavaScript handles indentation */
+}
+
 .json-length-badge {
   color: var(--text-secondary);
   font-size: 0.8em;
   font-weight: normal;
   margin-left: 6px;
   opacity: 0.7;
+}
+
+.json-ellipsis {
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Hide closing brackets when parent children are collapsed */
+.json-children.json-collapsed + .json-closing-bracket {
+  display: none;
 }
 
 .json-string {

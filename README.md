@@ -48,13 +48,13 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 - **Windows Portable**: [JSONinja.exe](../../releases/latest/download/JSONinja-Portable-v1.2.0-x64.exe)
 - **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.2.0.AppImage)
-- **Others**: [View All Releases](../../releases) 
+- **Others**: [View All Releases](../../releases)
 
 ### Quick Install
 
 **Windows:**
-1. Download and run the installer
-2. Follow the setup wizard
+1. Download and run the installer setup or portable version
+2. Optional: Follow the setup wizard if running the installer
 
 **Linux:**
 1. Download the AppImage
@@ -65,25 +65,17 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 [View All Releases](../../releases) | [Report Issues](../../issues)
 
-## Installation & Setup
+## Building from Source
 
 ### Prerequisites
-- Node.js (v16 or higher)
+- Node.js (v18 or higher)
 - npm or yarn
+- Git
 
-### Step 1: Set up the project
+### Step 1: Clone the repository
 ```bash
-# Create project directory
-mkdir jsoninja
-cd jsoninja
-
-# Copy all the files from the artifacts into this directory
-# - package.json
-# - main.js
-# - preload.js
-# - index.html
-# - styles.css
-# - renderer.js
+git clone https://github.com/KrunchMuffin/JSONinja.git
+cd JSONinja
 ```
 
 ### Step 2: Install dependencies
@@ -91,35 +83,43 @@ cd jsoninja
 npm install
 ```
 
-### Step 3: Run the application
+### Step 3: Run in development mode
 ```bash
-# Development mode
+# Start the application
 npm start
 
-# Or with dev flag
+# Or with development features
 npm run dev
 ```
 
-## Building an Executable
+### Step 4: Build executable (optional)
 
-### Create Windows .exe
 ```bash
+# Build for current platform only
 npm run build
+
+# Build for specific platforms
+npm run build-win    # Windows (x64 only)
+npm run build-mac    # macOS (Intel + Apple Silicon)
+npm run build-linux  # Linux (x64 only)
+
+# Build for all platforms
+npm run build-all
 ```
 
-### Create for all platforms
-```bash
-npm run build --all
-```
+Built files will be in the `dist/` folder.
 
-The built executable will be in the `dist` folder.
+### Build Targets
+- **Windows**: NSIS installer + Portable executable (x64 only)
+- **macOS**: DMG installer + ZIP archive (Intel + Apple Silicon)
+- **Linux**: AppImage + DEB + RPM packages (x64 only)
 
 ### Build Configuration
-The app uses `electron-builder` for packaging. Key features:
-- **Single-file installer** - NSIS installer for Windows
-- **No installation required** - Can be run as portable
-- **Auto-updater ready** - Prepared for future auto-update features
-- **Code signing ready** - Can be configured for code signing
+The app uses `electron-builder` with these features:
+- **64-bit only** - No 32-bit builds for better performance
+- **Portable options** - No installation required versions available
+- **Multiple formats** - Choose the package format that works for you
+- **Optimized packaging** - Only includes necessary files
 
 ## Usage Guide
 
@@ -162,7 +162,7 @@ The app uses `electron-builder` for packaging. Key features:
 ## File Structure
 
 ```
-jsoninja/
+JSONinja/
 ├── package.json          # Project configuration & dependencies
 ├── main.js               # Electron main process with recent files
 ├── preload.js            # Secure IPC bridge

@@ -136,7 +136,7 @@ class JSONViewer {
         document.getElementById('highlightMatches').addEventListener('change', (e) => {
             this.settings.behavior.highlightMatches = e.target.checked;
         });
-        
+
         // Rainbow Brackets (settings panel)
         const settingsRainbowBrackets = document.querySelector('.settings-panel #rainbowBrackets');
         if (settingsRainbowBrackets) {
@@ -209,7 +209,7 @@ class JSONViewer {
             this.toggleFullscreen();
             return;
         }
-        
+
         if (e.ctrlKey || e.metaKey) {
             switch (e.key) {
                 case 't':
@@ -393,7 +393,7 @@ class JSONViewer {
 
         if (typeof data === 'string') {
             const charCount = data.length;
-            const lengthBadge = (this.settings.behavior.showStringLength && charCount > this.settings.behavior.stringLengthThreshold) ? 
+            const lengthBadge = (this.settings.behavior.showStringLength && charCount > this.settings.behavior.stringLengthThreshold) ?
                 ` <span class="json-length-badge">(${charCount} chars)</span>` : '';
             return `<span class="json-string">"${this.escapeHtml(data)}"</span>${lengthBadge}`;
         }
@@ -409,7 +409,7 @@ class JSONViewer {
                 const comma = index < data.length - 1 ? ',' : '';
                 // Only add comma if the value is not a complex object/array (doesn't start with <div)
                 const commaToAdd = value.startsWith('<div') ? '' : comma;
-                
+
                 if (this.settings.behavior.showArrayIndices) {
                     if (value.includes('<div class="json-node')) {
                         // For nested objects/arrays, integrate the index into the expandable line
@@ -428,11 +428,14 @@ class JSONViewer {
                     return `<div>${nextIndent}${value}${commaToAdd}</div>`;
                 }
             }).join('');
+            
             const collapsed = !this.settings.behavior.autoExpand && level > 0;
             const toggleIcon = collapsed ? '▶' : '▼';
             const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
             const nodeId = `node-${path || 'root'}`;
             const bracketClass = getBracketClass(level);
+
+            const closingBracket = `<div class="json-closing-bracket">${indent}<span class="json-array-bracket${bracketClass}">]</span></div>`;
 
             return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
             <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
@@ -443,7 +446,7 @@ class JSONViewer {
             <div class="${childrenClass}">
                 ${items}
             </div>
-            ${indent}<span class="json-array-bracket${bracketClass}">]</span>
+            ${closingBracket}
         </div>`;
         }
 
@@ -468,6 +471,8 @@ class JSONViewer {
             const nodeId = `node-${path || 'root'}`;
             const bracketClass = getBracketClass(level);
 
+            const closingBracket = `<div class="json-closing-bracket">${indent}<span class="json-object-bracket${bracketClass}">}</span></div>`;
+
             return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
             <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
                 <span class="json-toggle">${toggleIcon}</span>
@@ -477,11 +482,27 @@ class JSONViewer {
             <div class="${childrenClass}">
                 ${items}
             </div>
-            ${indent}<span class="json-object-bracket${bracketClass}">}</span>
+            ${closingBracket}
         </div>`;
         }
 
         return String(data);
+    }
+
+    applyBasicSyntaxHighlighting(jsonText) {
+        // For now, just return the plain JSON with minimal highlighting
+        let highlighted = this.escapeHtml(jsonText);
+        
+        // Simple highlighting without complex regex
+        highlighted = highlighted.replace(/&quot;([^&]+)&quot;\s*:/g, '<span class="json-key">&quot;$1&quot;</span>:');
+        highlighted = highlighted.replace(/&quot;([^&]+)&quot;/g, '<span class="json-string">&quot;$1&quot;</span>');
+        highlighted = highlighted.replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+        highlighted = highlighted.replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>');
+        highlighted = highlighted.replace(/\bnull\b/g, '<span class="json-null">null</span>');
+        highlighted = highlighted.replace(/[\[\]]/g, '<span class="json-array-bracket">$&</span>');
+        highlighted = highlighted.replace(/[{}]/g, '<span class="json-object-bracket">$&</span>');
+        
+        return highlighted;
     }
 
     generateLineNumbers(content) {
@@ -623,7 +644,7 @@ class JSONViewer {
     }
 
     collapseAll() {
-        // Add collapsed class to all non-root children containers
+        // Add collapsed class to all non-root children containers  
         document.querySelectorAll('.json-node:not(.root) .json-children').forEach(children => {
             children.classList.add('json-collapsed');
         });
@@ -637,7 +658,7 @@ class JSONViewer {
     toggleFullscreen() {
         const app = document.getElementById('app');
         app.classList.toggle('app-fullscreen');
-        
+
         // Update button text
         const btn = document.getElementById('fullscreenBtn');
         if (app.classList.contains('app-fullscreen')) {
@@ -810,8 +831,82 @@ class JSONViewer {
         const highlights = document.querySelectorAll('.search-highlight');
         if (highlights[index]) {
             highlights[index].classList.add('current');
+
+            // Expand tree path to the search result
+            const result = this.searchResults[index];
+            if (result && result.path) {
+                this.expandPathToResult(result.path);
+            }
+
             highlights[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+    }
+
+    expandPathToResult(path) {
+        // Parse the path and expand all parent nodes
+        const pathParts = this.parseJsonPath(path);
+        let currentPath = '';
+
+        pathParts.forEach((part, index) => {
+            if (index === 0) {
+                currentPath = part;
+            } else {
+                currentPath += part.startsWith('[') ? part : '.' + part;
+            }
+
+            // Find and expand the node at this path
+            const nodeId = `node-${currentPath}`;
+            const node = document.querySelector(`[data-node-id="${nodeId}"]`);
+
+            if (node) {
+                const children = node.querySelector('.json-children');
+                const toggle = node.querySelector('.json-toggle');
+
+                if (children && toggle && children.classList.contains('json-collapsed')) {
+                    // Expand this node
+                    children.classList.remove('json-collapsed');
+                    toggle.textContent = '▼';
+                }
+            }
+        });
+    }
+
+    parseJsonPath(path) {
+        // Parse a JSON path like "users[0].name" into ["users", "[0]", "name"]
+        const parts = [];
+        let current = '';
+        let inBrackets = false;
+
+        for (let i = 0; i < path.length; i++) {
+            const char = path[i];
+
+            if (char === '[') {
+                if (current) {
+                    parts.push(current);
+                    current = '';
+                }
+                inBrackets = true;
+                current = char;
+            } else if (char === ']') {
+                current += char;
+                parts.push(current);
+                current = '';
+                inBrackets = false;
+            } else if (char === '.' && !inBrackets) {
+                if (current) {
+                    parts.push(current);
+                    current = '';
+                }
+            } else {
+                current += char;
+            }
+        }
+
+        if (current) {
+            parts.push(current);
+        }
+
+        return parts;
     }
 
     showWelcome() {
@@ -861,20 +956,20 @@ class JSONViewer {
         document.getElementById('showDataTypes').checked = this.settings.behavior.showDataTypes;
         document.getElementById('highlightMatches').checked = this.settings.behavior.highlightMatches;
         document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
-        
+
         // Sync settings panel checkboxes
         const settingsArrayIndices = document.getElementById('showArrayIndices');
         if (settingsArrayIndices) settingsArrayIndices.checked = this.settings.behavior.showArrayIndices;
-        
+
         const settingsStringLength = document.getElementById('showStringLength');
         if (settingsStringLength) settingsStringLength.checked = this.settings.behavior.showStringLength;
-        
+
         // Update character count threshold
         const thresholdSlider = document.getElementById('stringLengthThreshold');
         const thresholdValue = document.getElementById('stringLengthThresholdValue');
         if (thresholdSlider) thresholdSlider.value = this.settings.behavior.stringLengthThreshold || 20;
         if (thresholdValue) thresholdValue.textContent = (this.settings.behavior.stringLengthThreshold || 20) + ' chars';
-        
+
         // Sync settings panel rainbow brackets
         const settingsRainbowBrackets = document.querySelector('.settings-panel #rainbowBrackets');
         if (settingsRainbowBrackets) settingsRainbowBrackets.checked = this.settings.behavior.rainbowBrackets;
