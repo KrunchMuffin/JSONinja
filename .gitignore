@@ -5,3 +5,5 @@ release.ps1
 CLAUDE.md
 
 TODO.md
+
+.claude/settings.local.json

@@ -44,7 +44,6 @@ class JSONViewer {
         this.applySettings();
         this.bindEvents();
         this.bindElectronEvents();
-        this.createNewTab();
         this.updateUI();
     }
 
@@ -335,18 +334,23 @@ class JSONViewer {
             const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
             viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
 
-            if (this.settings.behavior.showLineNumbers) {
-                const lineNumbers = this.generateLineNumbers(activeTab.content);
-                const lineNumbersDiv = document.createElement('div');
-                lineNumbersDiv.className = 'line-numbers';
-                lineNumbersDiv.innerHTML = lineNumbers;
-                viewer.appendChild(lineNumbersDiv);
-            }
-
             const jsonContent = document.createElement('div');
             jsonContent.className = 'json-content';
             jsonContent.innerHTML = this.renderJSON(activeTab.jsonData, 0, true, '');
             viewer.appendChild(jsonContent);
+
+            // Always show the gutter if there are collapsible regions, even without line numbers
+            const hasCollapsibleRegions = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
+            if (this.settings.behavior.showLineNumbers || hasCollapsibleRegions) {
+                const lineNumbers = this.generateLineNumbers(activeTab.jsonData, !this.settings.behavior.showLineNumbers);
+                const lineNumbersDiv = document.createElement('div');
+                lineNumbersDiv.className = 'line-numbers';
+                lineNumbersDiv.innerHTML = lineNumbers;
+                console.log('Line numbers HTML length:', lineNumbers.length);
+                console.log('Line numbers content preview:', lineNumbers.substring(0, 100));
+                console.log('Line numbers content end:', lineNumbers.substring(lineNumbers.length - 100));
+                viewer.appendChild(lineNumbersDiv);
+            }
 
             // Status indicator
             const statusDiv = document.createElement('div');
@@ -367,126 +371,267 @@ class JSONViewer {
     }
 
     renderJSON(data, level = 0, isRoot = true, path = '') {
-        const indent = '  '.repeat(level);
-        const nextIndent = '  '.repeat(level + 1);
-
-        // Function to get bracket class based on level
-        const getBracketClass = (level) => {
-            if (!this.settings.behavior.rainbowBrackets) {
-                return ''; // Use default bracket colors
-            }
-            const bracketLevel = level % 8; // Cycle through 8 colors
-            return ` bracket-level-${bracketLevel}`;
-        };
-
-        if (data === null) {
-            return `<span class="json-null">null</span>`;
-        }
-
-        if (typeof data === 'boolean') {
-            return `<span class="json-boolean">${data}</span>`;
-        }
-
-        if (typeof data === 'number') {
-            return `<span class="json-number">${data}</span>`;
-        }
-
-        if (typeof data === 'string') {
-            const charCount = data.length;
-            const lengthBadge = (this.settings.behavior.showStringLength && charCount > this.settings.behavior.stringLengthThreshold) ?
-                ` <span class="json-length-badge">(${charCount} chars)</span>` : '';
-            return `<span class="json-string">"${this.escapeHtml(data)}"</span>${lengthBadge}`;
-        }
-
-        if (Array.isArray(data)) {
-            if (data.length === 0) {
-                return `<span class="json-array-bracket${getBracketClass(level)}">[]</span>`;
-            }
-
-            const items = data.map((item, index) => {
-                const itemPath = path ? `${path}[${index}]` : `[${index}]`;
-                const value = this.renderJSON(item, level + 1, false, itemPath);
-                const comma = index < data.length - 1 ? ',' : '';
-                // Only add comma if the value is not a complex object/array (doesn't start with <div)
-                const commaToAdd = value.startsWith('<div') ? '' : comma;
-
-                if (this.settings.behavior.showArrayIndices) {
-                    if (value.includes('<div class="json-node')) {
-                        // For nested objects/arrays, integrate the index into the expandable line
-                        const indexPrefix = `<span class="json-array-index">[${index}]</span> `;
-                        const modifiedValue = value.replace(
-                            /<span class="json-expandable"/,
-                            `${indexPrefix}<span class="json-expandable"`
-                        );
-                        return `<div>${nextIndent}${modifiedValue}${commaToAdd}</div>`;
-                    } else {
-                        // Simple values - add index
-                        return `<div>${nextIndent}<span class="json-array-index">[${index}]</span> ${value}${commaToAdd}</div>`;
-                    }
-                } else {
-                    // No indices - just show the values
-                    return `<div>${nextIndent}${value}${commaToAdd}</div>`;
+        // Generate clean JSON text with proper indentation
+        const jsonText = JSON.stringify(data, null, 2);
+        const lines = jsonText.split('\n');
+        console.log('renderJSON: Processing', lines.length, 'lines');
+        
+        // Build map of collapsible regions (preserve existing state)
+        const newRegions = this.buildCollapsibleMap(lines);
+        if (this.collapsibleRegions) {
+            // Preserve collapsed state from existing regions
+            Object.keys(newRegions).forEach(lineNumber => {
+                if (this.collapsibleRegions[lineNumber]) {
+                    newRegions[lineNumber].collapsed = this.collapsibleRegions[lineNumber].collapsed;
                 }
-            }).join('');
+            });
+        }
+        this.collapsibleRegions = newRegions;
+        console.log('Found', Object.keys(this.collapsibleRegions).length, 'collapsible regions');
+        
+        // Calculate bracket levels for rainbow brackets
+        if (this.settings.behavior.rainbowBrackets) {
+            this.bracketLevels = this.calculateBracketLevels(lines);
+        }
+        
+        // Convert each line to HTML with syntax highlighting
+        const htmlLines = lines.map((line, index) => {
+            const lineNumber = index + 1;
+            const highlighted = this.highlightJsonLine(line, lineNumber);
             
-            const collapsed = !this.settings.behavior.autoExpand && level > 0;
-            const toggleIcon = collapsed ? '▶' : '▼';
-            const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
-            const nodeId = `node-${path || 'root'}`;
-            const bracketClass = getBracketClass(level);
-
-            const closingBracket = `<div class="json-closing-bracket">${indent}<span class="json-array-bracket${bracketClass}">]</span></div>`;
-
-            return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
-            <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
-                <span class="json-toggle">${toggleIcon}</span>
-                <span class="json-array-bracket${bracketClass}">[</span>
-                ${this.settings.behavior.showDataTypes ? `<span class="json-type-badge">Array(${data.length})</span>` : ''}
-            </span>
-            <div class="${childrenClass}">
-                ${items}
-            </div>
-            ${closingBracket}
-        </div>`;
-        }
-
-        if (typeof data === 'object') {
-            const keys = Object.keys(data);
-            if (keys.length === 0) {
-                return `<span class="json-object-bracket${getBracketClass(level)}">{}</span>`;
+            // Check if this line should be hidden due to collapsed region
+            let isHidden = false;
+            for (const startLine in this.collapsibleRegions) {
+                const region = this.collapsibleRegions[startLine];
+                if (region.collapsed && lineNumber > parseInt(startLine) && lineNumber <= region.endLine) {
+                    isHidden = true;
+                    break;
+                }
             }
+            
+            const hiddenClass = isHidden ? ' json-line-hidden' : '';
+            
+            // Check if this is a collapsed region start line
+            let collapsedIndicator = '';
+            if (this.collapsibleRegions && this.collapsibleRegions[lineNumber] && this.collapsibleRegions[lineNumber].collapsed) {
+                collapsedIndicator = ' collapsed-region';
+            }
+            
+            return `<div class="json-line${hiddenClass}${collapsedIndicator}" data-line="${lineNumber}">${highlighted}</div>`;
+        });
+        
+        return htmlLines.join('');
+    }
 
-            const items = keys.map((key, index) => {
-                const keyPath = path ? `${path}.${key}` : key;
-                const value = this.renderJSON(data[key], level + 1, false, keyPath);
-                const comma = index < keys.length - 1 ? ',' : '';
-                // Only add comma if the value is not a complex object/array (doesn't start with <div)
-                const commaToAdd = value.startsWith('<div') ? '' : comma;
-                return `<div>${nextIndent}<span class="json-key">"${this.escapeHtml(key)}"</span>: ${value}${commaToAdd}</div>`;
-            }).join('');
+    calculateBracketLevels(lines) {
+        const bracketLevels = {};
+        let currentLevel = 0;
+        
+        lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            const trimmedLine = line.trim();
+            
+            // Store bracket info for this line
+            const brackets = [];
+            
+            // Count brackets in this line
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '{' || char === '[') {
+                    brackets.push({ char, level: currentLevel, position: i });
+                    currentLevel++;
+                } else if (char === '}' || char === ']') {
+                    currentLevel = Math.max(0, currentLevel - 1);
+                    brackets.push({ char, level: currentLevel, position: i });
+                }
+            }
+            
+            if (brackets.length > 0) {
+                bracketLevels[lineNumber] = brackets;
+            }
+        });
+        
+        return bracketLevels;
+    }
 
-            const collapsed = !this.settings.behavior.autoExpand && level > 0;
-            const toggleIcon = collapsed ? '▶' : '▼';
-            const childrenClass = collapsed ? 'json-children json-collapsed' : 'json-children';
-            const nodeId = `node-${path || 'root'}`;
-            const bracketClass = getBracketClass(level);
+    buildCollapsibleMap(lines) {
+        const collapsibleRegions = {};
+        const bracketStack = [];
+        
+        lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            const trimmedLine = line.trim();
+            
+            // More robust bracket detection
+            // Check for opening brackets that start a new object/array
+            const hasOpeningObject = trimmedLine.includes('{') && !this.isInlineObject(trimmedLine);
+            const hasOpeningArray = trimmedLine.includes('[') && !this.isInlineArray(trimmedLine);
+            
+            if (hasOpeningObject) {
+                bracketStack.push({
+                    lineNumber: lineNumber,
+                    char: '{',
+                    indentLevel: line.length - line.trimStart().length
+                });
+            }
+            
+            if (hasOpeningArray) {
+                bracketStack.push({
+                    lineNumber: lineNumber,
+                    char: '[',
+                    indentLevel: line.length - line.trimStart().length
+                });
+            }
+            
+            // Check for closing brackets
+            const hasClosingObject = (trimmedLine === '}' || trimmedLine === '},');
+            const hasClosingArray = (trimmedLine === ']' || trimmedLine === '],');
+            
+            if (hasClosingObject || hasClosingArray) {
+                const closingChar = hasClosingObject ? '}' : ']';
+                
+                // Find the most recent matching opening bracket
+                for (let i = bracketStack.length - 1; i >= 0; i--) {
+                    const opening = bracketStack[i];
+                    
+                    if ((opening.char === '{' && closingChar === '}') ||
+                        (opening.char === '[' && closingChar === ']')) {
+                        
+                        // Only create collapsible region if there's content between brackets
+                        if (lineNumber > opening.lineNumber + 1) {
+                            collapsibleRegions[opening.lineNumber] = {
+                                startLine: opening.lineNumber,
+                                endLine: lineNumber,
+                                type: opening.char === '{' ? 'object' : 'array',
+                                collapsed: false,
+                                indentLevel: opening.indentLevel
+                            };
+                        }
+                        
+                        // Remove this opening from stack
+                        bracketStack.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        });
+        
+        return collapsibleRegions;
+    }
 
-            const closingBracket = `<div class="json-closing-bracket">${indent}<span class="json-object-bracket${bracketClass}">}</span></div>`;
+    // Helper function to detect inline objects like { "key": "value" }
+    isInlineObject(line) {
+        const trimmed = line.trim();
+        return trimmed.includes('{') && trimmed.includes('}') && 
+               trimmed.indexOf('{') < trimmed.indexOf('}');
+    }
 
-            return `<div class="json-node ${isRoot ? 'root' : ''}" data-node-id="${nodeId}">
-            <span class="json-expandable" onclick="window.app.toggleNode('${nodeId}')">
-                <span class="json-toggle">${toggleIcon}</span>
-                <span class="json-object-bracket${bracketClass}">{</span>
-                ${this.settings.behavior.showDataTypes ? `<span class="json-type-badge">Object(${keys.length})</span>` : ''}
-            </span>
-            <div class="${childrenClass}">
-                ${items}
-            </div>
-            ${closingBracket}
-        </div>`;
+    // Helper function to detect inline arrays like [ "item1", "item2" ]
+    isInlineArray(line) {
+        const trimmed = line.trim();
+        return trimmed.includes('[') && trimmed.includes(']') && 
+               trimmed.indexOf('[') < trimmed.indexOf(']');
+    }
+
+    highlightJsonLine(line, lineNumber) {
+        let highlighted = this.escapeHtml(line);
+        
+        
+        // First apply syntax highlighting
+        // Process all quoted strings in one pass, determining if they're keys or values
+        highlighted = highlighted.replace(/&quot;([^&]+)&quot;(\s*:)?/g, (match, content, colon) => {
+            if (colon) {
+                // This is a key
+                return `<span class="json-key">&quot;${content}&quot;</span>${colon}`;
+            } else {
+                // This is a value
+                return `<span class="json-string">&quot;${content}&quot;</span>`;
+            }
+        });
+        
+        // Highlight numbers
+        highlighted = highlighted.replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+        
+        // Highlight booleans and null
+        highlighted = highlighted.replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>');
+        highlighted = highlighted.replace(/\bnull\b/g, '<span class="json-null">null</span>');
+        
+        // Highlight brackets
+        if (this.settings.behavior.rainbowBrackets && this.bracketLevels && this.bracketLevels[lineNumber]) {
+            // Rainbow brackets - replace each bracket with its level color
+            const brackets = this.bracketLevels[lineNumber];
+            let bracketIndex = 0;
+            
+            highlighted = highlighted.replace(/[{}\[\]]/g, (match) => {
+                if (bracketIndex < brackets.length) {
+                    const bracket = brackets[bracketIndex];
+                    const bracketClass = match === '{' || match === '}' ? 'json-object-bracket' : 'json-array-bracket';
+                    const levelClass = `bracket-level-${bracket.level % 8}`;
+                    bracketIndex++;
+                    return `<span class="${bracketClass} ${levelClass}">${match}</span>`;
+                }
+                return match;
+            });
+        } else {
+            // Standard bracket highlighting
+            highlighted = highlighted.replace(/[\[\]]/g, '<span class="json-array-bracket">$&</span>');
+            highlighted = highlighted.replace(/[{}]/g, '<span class="json-object-bracket">$&</span>');
         }
-
-        return String(data);
+        
+        // Then apply search highlighting on top
+        if (this.currentSearchQuery && this.searchResults) {
+            const lineMatches = this.searchResults.filter(result => result.lineNumber === lineNumber);
+            
+            if (lineMatches.length > 0) {
+                const searchRegex = new RegExp(`(${this.escapeRegex(this.currentSearchQuery)})`, 'gi');
+                
+                if (this.currentSearchType === 'key') {
+                    // Only highlight within json-key spans
+                    highlighted = highlighted.replace(/<span class="json-key">([^<]+)<\/span>/g, (match, keyContent) => {
+                        const highlightedKey = keyContent.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                        return `<span class="json-key">${highlightedKey}</span>`;
+                    });
+                } else if (this.currentSearchType === 'value') {
+                    // Highlight in all spans except json-key
+                    const patterns = [
+                        { regex: /<span class="json-string">([^<]+)<\/span>/g, class: 'json-string' },
+                        { regex: /<span class="json-number">([^<]+)<\/span>/g, class: 'json-number' },
+                        { regex: /<span class="json-boolean">([^<]+)<\/span>/g, class: 'json-boolean' },
+                        { regex: /<span class="json-null">([^<]+)<\/span>/g, class: 'json-null' }
+                    ];
+                    
+                    patterns.forEach(pattern => {
+                        highlighted = highlighted.replace(pattern.regex, (match, content) => {
+                            const highlightedContent = content.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                            return `<span class="${pattern.class}">${highlightedContent}</span>`;
+                        });
+                    });
+                } else {
+                    // Both - highlight in all content
+                    const allPatterns = [
+                        { regex: /<span class="json-key">([^<]+)<\/span>/g, class: 'json-key' },
+                        { regex: /<span class="json-string">([^<]+)<\/span>/g, class: 'json-string' },
+                        { regex: /<span class="json-number">([^<]+)<\/span>/g, class: 'json-number' },
+                        { regex: /<span class="json-boolean">([^<]+)<\/span>/g, class: 'json-boolean' },
+                        { regex: /<span class="json-null">([^<]+)<\/span>/g, class: 'json-null' }
+                    ];
+                    
+                    allPatterns.forEach(pattern => {
+                        highlighted = highlighted.replace(pattern.regex, (match, content) => {
+                            const highlightedContent = content.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                            return `<span class="${pattern.class}">${highlightedContent}</span>`;
+                        });
+                    });
+                }
+            }
+        }
+        
+        return highlighted;
+    }
+    
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     applyBasicSyntaxHighlighting(jsonText) {
@@ -505,16 +650,53 @@ class JSONViewer {
         return highlighted;
     }
 
-    generateLineNumbers(content) {
-        if (!content) return '';
-        const lines = content.split('\n');
-        return lines.map((_, index) => index + 1).join('\n');
+    generateLineNumbers(jsonData, hideNumbers = false) {
+        if (!jsonData) return '';
+        // Generate line numbers based on actual JSON lines
+        const jsonText = JSON.stringify(jsonData, null, 2);
+        const lines = jsonText.split('\n');
+        console.log('generateLineNumbers: Processing', lines.length, 'lines');
+        
+        // Generate line numbers with toggle buttons for collapsible regions
+        const lineNumbersHtml = lines.map((_, index) => {
+            const lineNumber = index + 1;
+            const hasToggle = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
+            
+            // Check if this line number should be hidden due to collapsed region
+            let isHidden = false;
+            for (const startLine in this.collapsibleRegions) {
+                const region = this.collapsibleRegions[startLine];
+                if (region.collapsed && lineNumber > parseInt(startLine) && lineNumber <= region.endLine) {
+                    isHidden = true;
+                    break;
+                }
+            }
+            
+            const hiddenClass = isHidden ? ' json-line-hidden' : '';
+            
+            if (hasToggle) {
+                const region = this.collapsibleRegions[lineNumber];
+                const toggleIcon = region.collapsed ? '▶' : '▼';
+                const collapsedClass = region.collapsed ? ' collapsed-region' : '';
+                const numberDisplay = hideNumbers ? '' : `<span class="line-num">${lineNumber}</span>`;
+                return `<div class="line-number-with-toggle${hiddenClass}${collapsedClass}" data-line="${lineNumber}">
+                    <button class="gutter-toggle" data-line="${lineNumber}" onclick="app.toggleRegion(${lineNumber})">${toggleIcon}</button>
+                    ${numberDisplay}
+                </div>`;
+            } else {
+                const numberDisplay = hideNumbers ? '' : lineNumber;
+                return `<div class="line-number${hiddenClass}" data-line="${lineNumber}">${numberDisplay}</div>`;
+            }
+        }).join('');
+        
+        return lineNumbersHtml;
     }
 
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML;
+        // textContent/innerHTML doesn't escape quotes, so we need to do it manually
+        return div.innerHTML.replace(/"/g, '&quot;');
     }
 
     loadJsonFromFile(content, fileName) {
@@ -612,47 +794,72 @@ class JSONViewer {
         this.loadJsonContent(minified, activeTab.title.replace(' (Invalid)', ''));
     }
 
-    toggleNode(nodeId) {
-        const node = document.querySelector(`[data-node-id="${nodeId}"]`);
-        if (!node) return;
-
-        const isCollapsed = node.querySelector('.json-children').classList.contains('json-collapsed');
-        const toggle = node.querySelector('.json-toggle');
-        const children = node.querySelector('.json-children');
-
-        if (isCollapsed) {
-            // Expand
-            children.classList.remove('json-collapsed');
-            toggle.textContent = '▼';
-        } else {
-            // Collapse
-            children.classList.add('json-collapsed');
-            toggle.textContent = '▶';
+    toggleRegion(lineNumber) {
+        if (!this.collapsibleRegions || !this.collapsibleRegions[lineNumber]) {
+            console.log('No collapsible region found for line:', lineNumber);
+            return;
         }
+        
+        const region = this.collapsibleRegions[lineNumber];
+        region.collapsed = !region.collapsed;
+        
+        console.log('Toggled region at line', lineNumber, 'collapsed:', region.collapsed);
+        
+        // Update the view to reflect the changes
+        this.updateActiveTabView();
+    }
+
+    toggleNode(nodeId) {
+        // Legacy method - now redirects to toggleRegion
+        console.log('toggleNode called for:', nodeId);
     }
 
     expandAll() {
-        // Remove collapsed class from all children containers
-        document.querySelectorAll('.json-children.json-collapsed').forEach(children => {
-            children.classList.remove('json-collapsed');
+        if (!this.collapsibleRegions) {
+            console.log('No collapsible regions available');
+            return;
+        }
+        
+        // Expand all regions
+        let hasChanges = false;
+        Object.keys(this.collapsibleRegions).forEach(lineNumber => {
+            const region = this.collapsibleRegions[lineNumber];
+            if (region.collapsed) {
+                region.collapsed = false;
+                hasChanges = true;
+            }
         });
-
-        // Update all toggle icons to expanded state
-        document.querySelectorAll('.json-toggle').forEach(toggle => {
-            toggle.textContent = '▼';
-        });
+        
+        if (hasChanges) {
+            console.log('Expanded all regions');
+            this.updateActiveTabView();
+        } else {
+            console.log('All regions already expanded');
+        }
     }
 
     collapseAll() {
-        // Add collapsed class to all non-root children containers  
-        document.querySelectorAll('.json-node:not(.root) .json-children').forEach(children => {
-            children.classList.add('json-collapsed');
+        if (!this.collapsibleRegions) {
+            console.log('No collapsible regions available');
+            return;
+        }
+        
+        // Collapse all regions
+        let hasChanges = false;
+        Object.keys(this.collapsibleRegions).forEach(lineNumber => {
+            const region = this.collapsibleRegions[lineNumber];
+            if (!region.collapsed) {
+                region.collapsed = true;
+                hasChanges = true;
+            }
         });
-
-        // Update all non-root toggle icons to collapsed state
-        document.querySelectorAll('.json-node:not(.root) .json-toggle').forEach(toggle => {
-            toggle.textContent = '▶';
-        });
+        
+        if (hasChanges) {
+            console.log('Collapsed all regions');
+            this.updateActiveTabView();
+        } else {
+            console.log('All regions already collapsed');
+        }
     }
 
     toggleFullscreen() {
@@ -700,14 +907,77 @@ class JSONViewer {
         const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
         if (!activeTab || !activeTab.jsonData) return;
 
-        this.searchResults = this.findMatches(activeTab.jsonData, query, searchType);
-        this.highlightSearchResults();
+        // Store search query for highlighting during render
+        this.currentSearchQuery = query;
+        this.currentSearchType = searchType;
+        
+        this.searchResults = this.findMatchesInLines(activeTab.jsonData, query, searchType);
         this.updateSearchResults(this.searchResults.length, this.searchResults.length > 0 ? 1 : 0);
 
         if (this.searchResults.length > 0) {
             this.currentSearchIndex = 0;
             this.scrollToSearchResult(0);
         }
+        
+        // Re-render to apply search highlighting
+        this.updateActiveTabView();
+    }
+
+    findMatchesInLines(data, query, searchType) {
+        const matches = [];
+        const searchQuery = query.toLowerCase();
+        const jsonText = JSON.stringify(data, null, 2);
+        const lines = jsonText.split('\n');
+        
+        lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            const lineLower = line.toLowerCase();
+            
+            if (searchType === 'key' || searchType === 'both') {
+                // Look for keys (strings followed by colon)
+                const keyMatch = line.match(/"([^"]+)":/);
+                if (keyMatch && keyMatch[1].toLowerCase().includes(searchQuery)) {
+                    matches.push({
+                        lineNumber: lineNumber,
+                        type: 'key',
+                        value: keyMatch[1],
+                        column: line.indexOf(keyMatch[0])
+                    });
+                }
+            }
+            
+            if (searchType === 'value' || searchType === 'both') {
+                // Look for string values
+                const valueMatches = line.matchAll(/"([^"]+)"/g);
+                for (const match of valueMatches) {
+                    // Skip if this is a key (followed by colon)
+                    const afterMatch = line.substring(match.index + match[0].length);
+                    if (!afterMatch.match(/^\s*:/)) {
+                        if (match[1].toLowerCase().includes(searchQuery)) {
+                            matches.push({
+                                lineNumber: lineNumber,
+                                type: 'value',
+                                value: match[1],
+                                column: match.index
+                            });
+                        }
+                    }
+                }
+                
+                // Look for non-string values (numbers, booleans, null)
+                const nonStringMatch = line.match(/:\s*([^,\s\]\}]+)/);
+                if (nonStringMatch && nonStringMatch[1].toLowerCase().includes(searchQuery)) {
+                    matches.push({
+                        lineNumber: lineNumber,
+                        type: 'value',
+                        value: nonStringMatch[1],
+                        column: line.indexOf(nonStringMatch[1])
+                    });
+                }
+            }
+        });
+        
+        return matches;
     }
 
     findMatches(data, query, searchType, path = '') {
@@ -797,11 +1067,13 @@ class JSONViewer {
     }
 
     clearSearchHighlights() {
-        document.querySelectorAll('.search-highlight').forEach(highlight => {
-            const parent = highlight.parentNode;
-            parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
-            parent.normalize();
-        });
+        this.currentSearchQuery = null;
+        this.currentSearchType = null;
+        this.searchResults = [];
+        this.currentSearchIndex = -1;
+        
+        // Re-render to remove highlights
+        this.updateActiveTabView();
     }
 
     updateSearchResults(total, current) {
@@ -823,23 +1095,51 @@ class JSONViewer {
     }
 
     scrollToSearchResult(index) {
-        // Update current highlight
-        document.querySelectorAll('.search-highlight.current').forEach(el => {
-            el.classList.remove('current');
-        });
-
-        const highlights = document.querySelectorAll('.search-highlight');
-        if (highlights[index]) {
-            highlights[index].classList.add('current');
-
-            // Expand tree path to the search result
-            const result = this.searchResults[index];
-            if (result && result.path) {
-                this.expandPathToResult(result.path);
+        if (!this.searchResults || index >= this.searchResults.length) return;
+        
+        const result = this.searchResults[index];
+        const lineNumber = result.lineNumber;
+        
+        // Expand any collapsed regions that contain this result
+        this.expandToShowLine(lineNumber);
+        
+        // Mark current search result
+        this.currentSearchIndex = index;
+        
+        // Re-render to update highlighting
+        this.updateActiveTabView();
+        
+        // Scroll to the line after render
+        setTimeout(() => {
+            const lineElement = document.querySelector(`.json-line[data-line="${lineNumber}"]`);
+            if (lineElement) {
+                lineElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Find and highlight the current match within the line
+                const highlights = lineElement.querySelectorAll('.search-highlight');
+                if (highlights.length > 0) {
+                    // Remove previous current highlight
+                    document.querySelectorAll('.search-highlight.current').forEach(el => {
+                        el.classList.remove('current');
+                    });
+                    
+                    // Add current highlight to the first match in this line
+                    highlights[0].classList.add('current');
+                }
             }
-
-            highlights[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        }, 0);
+    }
+    
+    expandToShowLine(targetLine) {
+        // Expand any collapsed regions that contain this line
+        Object.keys(this.collapsibleRegions).forEach(startLine => {
+            const region = this.collapsibleRegions[startLine];
+            if (region.collapsed && 
+                targetLine > parseInt(startLine) && 
+                targetLine <= region.endLine) {
+                region.collapsed = false;
+            }
+        });
     }
 
     expandPathToResult(path) {

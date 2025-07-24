@@ -356,8 +356,18 @@ body {
   font-size: var(--font-size);
   line-height: var(--line-height);
   background-color: var(--bg-primary);
-  white-space: nowrap; /* Default: no wrapping */
+  white-space: pre; /* Preserve JSON indentation from JSON.stringify */
   overflow-x: auto;
+}
+
+.json-line {
+  /* Individual JSON line styling */
+}
+
+.json-line-hidden,
+.line-number.json-line-hidden,
+.line-number-with-toggle.json-line-hidden {
+  display: none !important;
 }
 
 .json-viewer.with-line-numbers {
@@ -368,19 +378,83 @@ body {
   position: absolute;
   left: 0;
   top: 16px;
-  width: 40px;
+  width: 50px;
+  min-height: 100%;
   padding-right: 8px;
   border-right: 1px solid var(--border-color);
   text-align: right;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size);
   line-height: var(--line-height);
+  font-family: var(--font-family);
   user-select: none;
-  white-space: pre;
+  overflow: visible;
+}
+
+.line-number,
+.line-number-with-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: calc(var(--font-size) * var(--line-height));
+  line-height: var(--line-height);
+  position: relative;
+}
+
+.line-number-with-toggle .line-num {
+  flex: 1;
+  text-align: right;
+}
+
+.gutter-toggle {
+  position: absolute;
+  left: 0px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 9px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.gutter-toggle:hover {
+  color: var(--accent-color);
+  background-color: var(--bg-tertiary);
+  border-radius: 2px;
+}
+
+/* Collapsed region indicators */
+.json-line.collapsed-region {
+  border-bottom: 1px solid var(--text-secondary);
+  opacity: 0.8;
+}
+
+.line-number-with-toggle.collapsed-region {
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--text-secondary);
 }
 
 .json-viewer.with-line-numbers .json-content {
-  margin-left: 50px;
+  margin-left: 60px;
+}
+
+/* When only showing gutter toggles without line numbers */
+.json-viewer:not(.with-line-numbers) .json-content {
+  margin-left: 30px;
+}
+
+.json-viewer:not(.with-line-numbers) .line-numbers {
+  width: 25px;
 }
 
 /* Word wrap control */
