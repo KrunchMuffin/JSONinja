@@ -1,10 +1,15 @@
-# .github/workflows/release.yml - Super Simple Version
-name: Build Release Files
+name: Build and Release
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        type: string
 
 jobs:
   build-windows:
@@ -20,7 +25,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-files
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/latest.yml
 
   build-macos:
     runs-on: macos-latest
@@ -37,7 +44,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos-files
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest-mac.yml
 
   build-linux:
     runs-on: ubuntu-latest
@@ -55,4 +65,96 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-files
-          path: dist/*.AppImage
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/latest-linux.yml
+
+  create-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-files
+      
+      - name: Extract version and changelog
+        id: extract_info
+        run: |
+          # Get version from tag
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          
+          # Extract changelog for this version
+          if [ -f "CHANGELOG.md" ]; then
+            # Extract section between this version and the next header
+            CHANGELOG=$(awk -v ver="${VERSION#v}" '
+              BEGIN { found=0 }
+              /^## \[/ {
+                if ($0 ~ "\\["ver"\\]") {
+                  found=1
+                  next
+                } else if (found) {
+                  exit
+                }
+              }
+              found { print }
+            ' CHANGELOG.md)
+            
+            # If no specific version found, get content under Unreleased
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG=$(awk '
+                BEGIN { found=0 }
+                /^## \[Unreleased\]/ {
+                  found=1
+                  next
+                }
+                /^## \[/ && found {
+                  exit
+                }
+                found && /^###/ { print }
+                found && /^- / { print }
+              ' CHANGELOG.md)
+            fi
+            
+            # Default message if no changelog found
+            if [ -z "$CHANGELOG" ]; then
+              CHANGELOG="Release ${VERSION}"
+            fi
+          else
+            CHANGELOG="Release ${VERSION}"
+          fi
+          
+          # Write to file to preserve formatting
+          echo "$CHANGELOG" > release_notes.md
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.extract_info.outputs.VERSION }}
+          name: JSONinja ${{ steps.extract_info.outputs.VERSION }}
+          body_path: release_notes.md
+          draft: true
+          prerelease: false
+          files: |
+            release-files/windows-files/*.exe
+            release-files/macos-files/*.dmg
+            release-files/macos-files/*.zip
+            release-files/linux-files/*.AppImage
+            release-files/linux-files/*.deb
+            release-files/linux-files/*.rpm
+            release-files/windows-files/latest.yml
+            release-files/macos-files/latest-mac.yml
+            release-files/linux-files/latest-linux.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

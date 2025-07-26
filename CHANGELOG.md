@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-07-26
+
+### Added
+- 🌍 **Character Encoding Detection** - Automatic detection and handling of files with special characters
+  - Auto-detects Latin-1 (ISO-8859-1) encoded files
+  - Shows encoding notification with options to switch between UTF-8, Latin-1, and Windows-1252
+  - Encoding warnings for files with unreadable characters
+  - Seamless file reloading with different encodings
+- 🖱️ **OS Context Menu Integration** - "Open with JSONinja" right-click support
+  - Installer version automatically registers file associations
+  - Portable version includes menu options for manual registration/unregistration
+  - Single instance enforcement - opening files launches existing window
+  - Command-line file argument support for external file managers
+- 🔢 **Enhanced Line Number Display** - Improved handling for files with 3-4+ digit line numbers
+  - Increased gutter width to accommodate large line numbers
+  - Fixed vertical alignment issues between line numbers and content
+  - Better fold button integration in the gutter
+- 🌈 **Improved Rainbow Brackets** - Better color alternation for array elements
+  - Each object within an array now gets different bracket colors
+  - Proper color matching for opening and closing brackets
+  - Array element index tracking for consistent coloring
+- 🚀 **Large File Performance** - Three-tier optimization system for files of any size
+  - Normal rendering for files under 5,000 lines
+  - Progressive rendering with idle callbacks for 5,000-50,000 lines
+  - Virtual scrolling for 50,000+ lines (only renders visible content)
+  - File size warnings for files over 10MB
+  - Can easily handle over 1 million lines.
+
+### Changed
+- 🏗️ **Complete Rendering Engine Rewrite** - Rebuilt the entire JSON rendering system from scratch
+  - The new engine provides better performance and more reliable line number handling
+  - Note: Array index display and string length badges from 1.2.0 were removed (to be reimplemented)
+
+### Fixed
+- 📝 **Word Wrap CSS** - Fixed word wrap not working due to CSS specificity issues
+- 🔄 **Encoding Metadata Preservation** - Fixed file metadata being lost during tab updates
+- 📁 **Sidebar File Loading** - "Load JSON" button now uses same encoding detection as File menu
+- 🎨 **Theme Consistency** - Fixed encoding warning/success message colors for all themes
+- 🖼️ **Icon References** - Fixed missing icon file references in build configuration
+
+### Improved
+- 🎯 **Consistent File Opening** - Both File menu and sidebar button use identical file handling
+- 📊 **Better Error Handling** - Clear error messages for encoding issues
+- 🔧 **Registry Integration** - More robust Windows registry entries for file associations
+- 🎨 **UI Polish** - Better spacing and layout for encoding notifications
+
+### Technical Improvements
+- 🔐 **Single Instance Lock** - Prevents multiple app instances and handles file arguments
+- 📝 **Encoding Library** - Integrated iconv-lite for comprehensive encoding support
+- 🏗️ **Build Configuration** - Added file associations to electron-builder config
+- 🧹 **Code Cleanup** - Removed all debug console.log statements for production
+
 ## [1.2.0] - 2025-07-23
 
 ### Added
