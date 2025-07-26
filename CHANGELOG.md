@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2025-07-26
 
+## [1.3.0] - 2025-07-26
+
 ### Added
 - 🌍 **Character Encoding Detection** - Automatic detection and handling of files with special characters
   - Auto-detects Latin-1 (ISO-8859-1) encoded files
