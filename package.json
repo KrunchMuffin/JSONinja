@@ -20,7 +20,10 @@
     "electron",
     "multi-tab"
   ],
-  "author": {"name": "DAB Worx", "email": "support@dabworx.com"},
+  "author": {
+    "name": "DAB Worx",
+    "email": "support@dabworx.com"
+  },
   "contributors": [
     "KrunchMuffin <support@dabworx.com>"
   ],
@@ -56,7 +59,9 @@
       "styles.css",
       "renderer.js",
       "preload.js",
-      "package.json"
+      "package.json",
+      "JSONinja.png",
+      "JSONinja.ico"
     ],
     "win": {
       "target": [
@@ -82,8 +87,18 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "perMachine": false
     },
+    "fileAssociations": [
+      {
+        "ext": "json",
+        "name": "JSON File",
+        "description": "JavaScript Object Notation File",
+        "icon": "JSONinja.ico",
+        "role": "Editor"
+      }
+    ],
     "mac": {
       "target": [
         {
@@ -145,5 +160,8 @@
       "category": "Development",
       "artifactName": "${productName}-v${version}-${arch}.${ext}"
     }
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
   }
 }

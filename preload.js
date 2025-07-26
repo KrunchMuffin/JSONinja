@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File operations
   onFileOpened: (callback) => ipcRenderer.on('file-opened', callback),
+  reloadWithEncoding: (data) => ipcRenderer.invoke('reload-with-encoding', data),
+  showOpenDialog: () => ipcRenderer.send('show-open-dialog'),
 
   // Menu actions
   onNewTab: (callback) => ipcRenderer.on('new-tab', callback),

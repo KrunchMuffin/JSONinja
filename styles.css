@@ -564,13 +564,22 @@ body.show-whitespace .whitespace-tab::before {
 
 /* Word wrap control */
 .json-viewer.word-wrap {
-  white-space: pre-wrap; /* Enable wrapping when class is present */
-  overflow-x: visible;
+  white-space: pre-wrap !important; /* Enable wrapping when class is present */
+  overflow-x: auto; /* Still allow horizontal scroll if needed */
+}
+
+.json-viewer.word-wrap .json-content {
+  white-space: pre-wrap !important; /* Override json-content's pre setting */
+}
+
+.json-viewer.word-wrap .json-line {
+  white-space: pre-wrap !important; /* Override the json-line's pre setting */
 }
 
 .json-viewer.word-wrap .json-string,
 .json-viewer.word-wrap .json-key {
   word-break: break-word; /* Allow long strings to break */
+  overflow-wrap: break-word; /* Alternative property for better support */
 }
 
 /* JSON syntax highlighting */
@@ -949,6 +958,103 @@ body.show-whitespace .whitespace-tab::before {
   background-color: #331010;
   border-color: #f44336;
   color: #f48fb1;
+}
+
+/* Encoding warning */
+.encoding-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 12px;
+  padding-right: 40px; /* Make room for close button */
+  margin: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  position: relative;
+}
+
+[data-theme="dark"] .encoding-warning {
+  background-color: #332b00;
+  border-color: #665500;
+  color: #ffeaa7;
+}
+
+.warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.warning-text {
+  flex: 1;
+}
+
+.reload-encoding-btn {
+  padding: 4px 12px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.2s;
+}
+
+.reload-encoding-btn:hover {
+  opacity: 0.8;
+}
+
+.close-warning-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-warning-btn:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Encoding success */
+.encoding-success {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  padding: 12px;
+  padding-right: 40px; /* Make room for close button */
+  margin: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  position: relative;
+}
+
+[data-theme="dark"] .encoding-success {
+  background-color: #003320;
+  border-color: #00664d;
+  color: #4CAF50;
+}
+
+.success-icon {
+  color: #4CAF50;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.success-text {
+  flex: 1;
 }
 
 /* Loading indicator */

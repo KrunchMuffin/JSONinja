@@ -81,11 +81,13 @@ class JSONViewer {
         });
         document.getElementById('wordWrap').addEventListener('change', (e) => {
             this.settings.behavior.wordWrap = e.target.checked;
-            // Just toggle the class on the viewer - no re-render needed!
-            const viewer = document.querySelector('.json-viewer');
-            if (viewer) {
+            // Apply to ALL viewers (in case of multiple tabs)
+            const viewers = document.querySelectorAll('.json-viewer');
+            viewers.forEach(viewer => {
                 viewer.classList.toggle('word-wrap', e.target.checked);
-            }
+            });
+            // Save the setting
+            this.saveSettings();
         });
 
         // Quick settings
@@ -214,7 +216,23 @@ class JSONViewer {
     bindElectronEvents() {
         if (window.electronAPI) {
             window.electronAPI.onFileOpened((event, data) => {
+                
+                // Create new tab and get its ID
+                const newTabId = this.createNewTab();
+                
+                // Find the newly created tab
+                const activeTab = this.tabs.find(tab => tab.id === newTabId);
+                if (activeTab) {
+                    // Store file metadata BEFORE loading content
+                    activeTab.filePath = data.filePath;
+                    activeTab.encoding = data.encoding || 'utf-8';
+                    activeTab.hasEncodingIssues = data.hasEncodingIssues || false;
+                    activeTab.wasAutoDetected = data.wasAutoDetected || false;
+                }
+                
+                // Load the content - this will trigger updateContentUI which will show the warning if needed
                 this.loadJsonFromFile(data.content, data.fileName);
+                
             });
 
             window.electronAPI.onNewTab(() => this.createNewTab());
@@ -278,7 +296,9 @@ class JSONViewer {
             content: null,
             jsonData: null,
             isValid: null,
-            filePath: null
+            filePath: null,
+            encoding: 'utf-8',
+            hasEncodingIssues: false
         };
 
         this.tabs.push(tab);
@@ -286,6 +306,7 @@ class JSONViewer {
         this.updateTabsUI();
         this.updateContentUI();
         this.hideWelcome();
+        return tabId; // Return the tab ID
     }
 
     closeTab(tabId) {
@@ -352,6 +373,17 @@ class JSONViewer {
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'tab-content active';
+
+        // Show encoding warning if needed (before JSON content)
+        // Show warning for encoding issues OR auto-detected encoding
+        if ((activeTab.hasEncodingIssues || activeTab.wasAutoDetected) && activeTab.filePath && activeTab.encoding) {
+            const warningDiv = activeTab.wasAutoDetected ? 
+                this.createEncodingSuccess(activeTab.encoding) : 
+                this.createEncodingWarning(activeTab.encoding);
+            if (warningDiv) {
+                contentDiv.appendChild(warningDiv);
+            }
+        }
 
         if (activeTab.jsonData) {
             // Check file size and use appropriate rendering method
@@ -681,7 +713,6 @@ class JSONViewer {
         const indentSize = this.settings.behavior.indentSize || 2;
         const jsonText = JSON.stringify(data, null, indentSize);
         const lines = jsonText.split('\n');
-        console.log('renderJSON: Processing', lines.length, 'lines');
         
         
         // Build map of collapsible regions (preserve existing state)
@@ -695,7 +726,6 @@ class JSONViewer {
             });
         }
         this.collapsibleRegions = newRegions;
-        console.log('Found', Object.keys(this.collapsibleRegions).length, 'collapsible regions');
         
         // Calculate bracket levels for rainbow brackets
         if (this.settings.behavior.rainbowBrackets) {
@@ -727,8 +757,6 @@ class JSONViewer {
             
             const result = `<div class="json-line${hiddenClass}${collapsedIndicator}" data-line="${lineNumber}">${highlighted}</div>`;
             if (lineNumber === 6) {
-                console.log('Line 6 HTML:', result);
-                console.log('Line 6 raw:', line);
             }
             return result;
         });
@@ -1079,7 +1107,6 @@ class JSONViewer {
         // Generate line numbers based on actual JSON lines
         const jsonText = JSON.stringify(jsonData, null, this.settings.behavior.indentSize || 2);
         const lines = jsonText.split('\n');
-        console.log('generateLineNumbers: Processing', lines.length, 'lines');
         
         // Generate line numbers with toggle buttons for collapsible regions
         const lineNumbersHtml = lines.map((_, index) => {
@@ -1142,6 +1169,7 @@ class JSONViewer {
         const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
         if (!activeTab) return;
 
+
         // Check file size
         const sizeInMB = new Blob([content]).size / (1024 * 1024);
         if (sizeInMB > 10) {
@@ -1156,34 +1184,42 @@ class JSONViewer {
             activeTab.title = title;
             activeTab.isValid = true;
             activeTab.error = null;
+            // Don't overwrite encoding metadata if it exists
         } catch (error) {
             activeTab.content = content;
             activeTab.jsonData = null;
             activeTab.title = title + ' (Invalid)';
             activeTab.isValid = false;
             activeTab.error = error.message;
+            // Don't overwrite encoding metadata if it exists
         }
+
 
         this.updateTabsUI();
         this.updateContentUI();
     }
 
     showFileDialog() {
-        // This would typically be handled by Electron's main process
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json,application/json';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.loadJsonContent(e.target.result, file.name);
-                };
-                reader.readAsText(file);
-            }
-        };
-        input.click();
+        if (window.electronAPI && window.electronAPI.showOpenDialog) {
+            // Use Electron's file dialog for proper encoding detection
+            window.electronAPI.showOpenDialog();
+        } else {
+            // Fallback for non-Electron environment (like web preview)
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.loadJsonContent(e.target.result, file.name);
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
     }
 
     showPasteModal() {
@@ -1234,14 +1270,12 @@ class JSONViewer {
 
     toggleRegion(lineNumber) {
         if (!this.collapsibleRegions || !this.collapsibleRegions[lineNumber]) {
-            console.log('No collapsible region found for line:', lineNumber);
             return;
         }
         
         const region = this.collapsibleRegions[lineNumber];
         region.collapsed = !region.collapsed;
         
-        console.log('Toggled region at line', lineNumber, 'collapsed:', region.collapsed);
         
         // Update only the affected lines without full re-render
         this.updateCollapsedRegion(lineNumber, region);
@@ -1318,7 +1352,6 @@ class JSONViewer {
 
     expandAll() {
         if (!this.collapsibleRegions) {
-            console.log('No collapsible regions available');
             return;
         }
         
@@ -1333,16 +1366,13 @@ class JSONViewer {
         });
         
         if (hasChanges) {
-            console.log('Expanded all regions');
             this.updateActiveTabView();
         } else {
-            console.log('All regions already expanded');
         }
     }
 
     collapseAll() {
         if (!this.collapsibleRegions) {
-            console.log('No collapsible regions available');
             return;
         }
         
@@ -1357,10 +1387,8 @@ class JSONViewer {
         });
         
         if (hasChanges) {
-            console.log('Collapsed all regions');
             this.updateActiveTabView();
         } else {
-            console.log('All regions already collapsed');
         }
     }
 
@@ -1750,7 +1778,6 @@ class JSONViewer {
                 };
             }
         } catch (error) {
-            console.error('Failed to load settings:', error);
         }
     }
 
@@ -1842,6 +1869,153 @@ class JSONViewer {
                     updatedViewer.style.scrollBehavior = '';
                 }, 100);
             }
+        }
+    }
+
+    createEncodingWarning(currentEncoding) {
+        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
+        if (!activeTab || !activeTab.filePath) return null;
+        
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'encoding-warning';
+        warningDiv.innerHTML = `
+            <span class="warning-icon">⚠️</span>
+            <span class="warning-text">This file may contain special characters. Current encoding: ${currentEncoding}</span>
+            <button class="reload-encoding-btn" data-encoding="latin1">Try Latin-1</button>
+            <button class="reload-encoding-btn" data-encoding="cp1252">Try Windows-1252</button>
+            <button class="reload-encoding-btn" data-encoding="utf-8">Try UTF-8</button>
+            <button class="close-warning-btn">×</button>
+        `;
+        
+        // Add event listeners
+        warningDiv.querySelectorAll('.reload-encoding-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const encoding = btn.dataset.encoding;
+                this.reloadWithEncoding(activeTab.filePath, encoding);
+                warningDiv.remove();
+            });
+        });
+        
+        warningDiv.querySelector('.close-warning-btn').addEventListener('click', () => {
+            warningDiv.remove();
+            // Also clear the encoding issue flag
+            activeTab.hasEncodingIssues = false;
+            this.updateContentUI();
+        });
+        
+        return warningDiv;
+    }
+
+    showEncodingWarning(currentEncoding) {
+        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
+        if (!activeTab || !activeTab.filePath) {
+            return;
+        }
+        
+        // Just trigger a re-render since updateContentUI now handles the warning
+        this.updateContentUI();
+    }
+
+    async reloadWithEncoding(filePath, encoding) {
+        if (!window.electronAPI) return;
+        
+        try {
+            const result = await window.electronAPI.reloadWithEncoding({ filePath, encoding });
+            if (result.success) {
+                const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
+                if (activeTab) {
+                    // Store the metadata before loading content
+                    const originalFilePath = activeTab.filePath;
+                    activeTab.encoding = encoding;
+                    activeTab.hasEncodingIssues = false;
+                    activeTab.wasAutoDetected = false; // Manual selection
+                    
+                    // Check if the new encoding has issues (replacement characters)
+                    if (result.content.includes('�')) {
+                        activeTab.hasEncodingIssues = true;
+                    }
+                    
+                    this.loadJsonContent(result.content, result.fileName);
+                    
+                    // Restore the filePath after loading content
+                    activeTab.filePath = originalFilePath;
+                    
+                    // Show appropriate indicator
+                    if (activeTab.hasEncodingIssues) {
+                        // Content will show warning on next render
+                        this.updateContentUI();
+                    } else {
+                        // Show success indicator
+                        this.showEncodingSuccess(encoding);
+                    }
+                }
+            } else {
+                alert(`Failed to reload with ${encoding} encoding: ${result.error}`);
+            }
+        } catch (error) {
+            alert(`Error reloading file: ${error.message}`);
+        }
+    }
+
+    createEncodingSuccess(encoding) {
+        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
+        if (!activeTab || !activeTab.filePath) return null;
+        
+        const successDiv = document.createElement('div');
+        successDiv.className = 'encoding-success';
+        successDiv.innerHTML = `
+            <span class="success-icon">✓</span>
+            <span class="success-text">Auto-detected ${encoding} encoding. File loaded successfully.</span>
+            <button class="reload-encoding-btn" data-encoding="utf-8">Try UTF-8</button>
+            <button class="reload-encoding-btn" data-encoding="latin1">Try Latin-1</button>
+            <button class="reload-encoding-btn" data-encoding="windows-1252">Try Windows-1252</button>
+            <button class="close-warning-btn">×</button>
+        `;
+        
+        // Add event listeners
+        successDiv.querySelectorAll('.reload-encoding-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const newEncoding = btn.dataset.encoding;
+                this.reloadWithEncoding(activeTab.filePath, newEncoding);
+                successDiv.remove();
+            });
+        });
+        
+        successDiv.querySelector('.close-warning-btn').addEventListener('click', () => {
+            successDiv.remove();
+        });
+        
+        return successDiv;
+    }
+
+    showEncodingSuccess(encoding) {
+        // Remove any existing encoding messages
+        const existingWarning = document.querySelector('.encoding-warning');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+        const existingSuccess = document.querySelector('.encoding-success');
+        if (existingSuccess) {
+            existingSuccess.remove();
+        }
+        
+        const successDiv = document.createElement('div');
+        successDiv.className = 'encoding-success';
+        successDiv.innerHTML = `
+            <span class="success-icon">✓</span>
+            <span class="success-text">Successfully reloaded with ${encoding} encoding</span>
+        `;
+        
+        // Find the active tab content div
+        const tabContent = document.querySelector('.tab-content.active');
+        if (tabContent) {
+            // Insert success message at the beginning of the tab content
+            tabContent.insertBefore(successDiv, tabContent.firstChild);
+            
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
         }
     }
 }
