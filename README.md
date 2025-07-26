@@ -17,6 +17,7 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 - **Full-Screen Mode** - Distraction-free viewing with F11 toggle
 - **Recent Files** - Quick access to your last 10 opened JSON files
 - **Character Encoding Detection** - Automatic detection and handling of files with special characters (Latin-1/ISO-8859-1)
+- **Windows Context Menu** - Right-click any .json file to open directly in JSONinja
 
 ### 🎨 Customization
 - **4 Built-in Themes** - Dark, Light, GitHub, and Monokai with theme-aware rainbow brackets
@@ -135,6 +136,7 @@ The app uses `electron-builder` with these features:
 
 ### Loading JSON Data
 - **From File**: Click "Load JSON File" or use Ctrl+O
+- **Right-Click**: Right-click any .json file and select "Open with JSONinja"
 - **Recent Files**: Quick access to your last 10 opened files via menu
 - **Paste**: Click "Paste JSON" and paste your content
 - **Drag & Drop**: Drag JSON files directly onto the application
@@ -158,6 +160,8 @@ The app uses `electron-builder` with these features:
 - **Collapse All** - Ctrl+Shift+E collapses everything
 - **Array Indices** - Toggle `[0]`, `[1]`, `[2]` display for arrays (default: on)
 - **String Length** - Show character count for long strings with configurable threshold
+- ~~**Stats Bar**~~ - *Coming back soon!*
+- ~~**Path Display**~~ - *Coming back soon!*
 - **Rainbow Brackets** - Color-coded bracket nesting with 8-color cycle
 - **Full Screen** - F11 for distraction-free viewing
 - **Line Numbers** - Toggle in quick settings
