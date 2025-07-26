@@ -6,6 +6,7 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 ### 🚀 Core Features
 - **Multi-tab Interface** - Work with multiple JSON files simultaneously
+- **Large File Support** - Handle massive JSON files with 1+ million lines efficiently
 - **File Operations** - Load JSON files, paste content, or use recent files menu
 - **Real-time Validation** - Instant JSON syntax validation and error reporting
 - **Format & Minify** - Pretty-print or minify JSON with one click
@@ -15,6 +16,7 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 - **String Length Badges** - Character count display for long strings with configurable threshold
 - **Full-Screen Mode** - Distraction-free viewing with F11 toggle
 - **Recent Files** - Quick access to your last 10 opened JSON files
+- **Character Encoding Detection** - Automatic detection and handling of files with special characters (Latin-1/ISO-8859-1)
 
 ### 🎨 Customization
 - **4 Built-in Themes** - Dark, Light, GitHub, and Monokai with theme-aware rainbow brackets
@@ -44,10 +46,12 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 ## 📦 Downloads
 
-### Latest Release (v1.2.0)
+### Latest Release (v1.3.0)
 
-- **Windows Portable**: [JSONinja.exe](../../releases/latest/download/JSONinja-Portable-v1.2.0-x64.exe)
-- **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-1.2.0.AppImage)
+- **Windows Installer**: [JSONinja-Setup.exe](../../releases/latest/download/JSONinja-Setup-v1.3.0-x64.exe)
+- **Windows Portable**: [JSONinja-Portable.exe](../../releases/latest/download/JSONinja-Portable-v1.3.0-x64.exe)
+- **macOS**: [JSONinja.dmg](../../releases/latest/download/JSONinja-v1.3.0.dmg)
+- **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-v1.3.0-x86_64.AppImage)
 - **Others**: [View All Releases](../../releases)
 
 ### Quick Install
