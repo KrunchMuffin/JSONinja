@@ -34,7 +34,9 @@ class JSONViewer {
                 rainbowBrackets: false,
                 showStringLength: false,  // Show character count for long strings
                 showArrayIndices: true,   // Show [0], [1] indices for array items
-                stringLengthThreshold: 20 // Character threshold for showing length badges
+                stringLengthThreshold: 20, // Character threshold for showing length badges
+                indentSize: 2,  // Number of spaces for JSON indentation
+                showWhitespace: false  // Show whitespace characters like spaces and tabs
             }
         };
     }
@@ -64,11 +66,26 @@ class JSONViewer {
         document.getElementById('fullscreenBtn').addEventListener('click', () => this.toggleFullscreen());
         document.getElementById('showLineNumbers').addEventListener('change', (e) => {
             this.settings.behavior.showLineNumbers = e.target.checked;
-            this.updateActiveTabView();
+            // Just toggle the body class - no re-render needed!
+            document.body.classList.toggle('show-line-numbers', e.target.checked);
+            
+            // Also update the viewer classes
+            const viewer = document.querySelector('.json-viewer');
+            if (viewer) {
+                viewer.classList.toggle('with-line-numbers', e.target.checked);
+                
+                // Check if we have collapsible regions
+                const hasCollapsible = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
+                viewer.classList.toggle('has-collapsible-regions', hasCollapsible);
+            }
         });
         document.getElementById('wordWrap').addEventListener('change', (e) => {
             this.settings.behavior.wordWrap = e.target.checked;
-            this.updateActiveTabView();
+            // Just toggle the class on the viewer - no re-render needed!
+            const viewer = document.querySelector('.json-viewer');
+            if (viewer) {
+                viewer.classList.toggle('word-wrap', e.target.checked);
+            }
         });
 
         // Quick settings
@@ -158,6 +175,14 @@ class JSONViewer {
         document.getElementById('rainbowBrackets').addEventListener('change', (e) => {
             this.settings.behavior.rainbowBrackets = e.target.checked;
             this.updateActiveTabViewPreservingState();
+            this.updateSettingsUI(); // Sync with settings panel
+        });
+        
+        // Show Whitespace (sidebar)
+        document.getElementById('showWhitespace').addEventListener('change', (e) => {
+            this.settings.behavior.showWhitespace = e.target.checked;
+            // Just toggle the body class - no re-render needed!
+            document.body.classList.toggle('show-whitespace', e.target.checked);
             this.updateSettingsUI(); // Sync with settings panel
         });
 
@@ -329,36 +354,19 @@ class JSONViewer {
         contentDiv.className = 'tab-content active';
 
         if (activeTab.jsonData) {
-            const viewer = document.createElement('div');
-            // Add word-wrap class based on settings
-            const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
-            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
+            // Check file size and use appropriate rendering method
+            const jsonText = JSON.stringify(activeTab.jsonData, null, this.settings.behavior.indentSize || 2);
+            const lineCount = jsonText.split('\n').length;
+            const isLargeFile = lineCount > 5000; // Threshold for progressive rendering
+            const isVeryLargeFile = lineCount > 50000; // Threshold for virtual scrolling
 
-            const jsonContent = document.createElement('div');
-            jsonContent.className = 'json-content';
-            jsonContent.innerHTML = this.renderJSON(activeTab.jsonData, 0, true, '');
-            viewer.appendChild(jsonContent);
-
-            // Always show the gutter if there are collapsible regions, even without line numbers
-            const hasCollapsibleRegions = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
-            if (this.settings.behavior.showLineNumbers || hasCollapsibleRegions) {
-                const lineNumbers = this.generateLineNumbers(activeTab.jsonData, !this.settings.behavior.showLineNumbers);
-                const lineNumbersDiv = document.createElement('div');
-                lineNumbersDiv.className = 'line-numbers';
-                lineNumbersDiv.innerHTML = lineNumbers;
-                console.log('Line numbers HTML length:', lineNumbers.length);
-                console.log('Line numbers content preview:', lineNumbers.substring(0, 100));
-                console.log('Line numbers content end:', lineNumbers.substring(lineNumbers.length - 100));
-                viewer.appendChild(lineNumbersDiv);
+            if (isVeryLargeFile) {
+                this.renderVirtualJSON(activeTab, contentDiv, jsonText);
+            } else if (isLargeFile) {
+                this.renderLargeJSON(activeTab, contentDiv, jsonText);
+            } else {
+                this.renderNormalJSON(activeTab, contentDiv);
             }
-
-            // Status indicator
-            const statusDiv = document.createElement('div');
-            statusDiv.className = `status-indicator ${activeTab.isValid ? 'status-valid' : 'status-invalid'}`;
-            statusDiv.textContent = activeTab.isValid ? 'Valid JSON' : 'Invalid JSON';
-            viewer.appendChild(statusDiv);
-
-            contentDiv.appendChild(viewer);
         } else if (activeTab.content) {
             // Show error for invalid JSON
             const errorDiv = document.createElement('div');
@@ -370,11 +378,311 @@ class JSONViewer {
         tabContent.appendChild(contentDiv);
     }
 
+    renderNormalJSON(activeTab, contentDiv) {
+        const viewer = document.createElement('div');
+        // Add word-wrap class based on settings
+        const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
+        viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
+
+        const jsonContent = document.createElement('div');
+        jsonContent.className = 'json-content';
+        jsonContent.innerHTML = this.renderJSON(activeTab.jsonData, 0, true, '');
+        viewer.appendChild(jsonContent);
+
+        // Always render line numbers, CSS will control visibility
+        const hasCollapsibleRegions = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
+        const lineNumbers = this.generateLineNumbers(activeTab.jsonData, false);
+        const lineNumbersDiv = document.createElement('div');
+        lineNumbersDiv.className = 'line-numbers';
+        lineNumbersDiv.innerHTML = lineNumbers;
+        viewer.appendChild(lineNumbersDiv);
+        
+        // Set initial viewer classes
+        viewer.classList.toggle('with-line-numbers', this.settings.behavior.showLineNumbers);
+        viewer.classList.toggle('has-collapsible-regions', hasCollapsibleRegions);
+
+        // Status indicator
+        const statusDiv = document.createElement('div');
+        statusDiv.className = `status-indicator ${activeTab.isValid ? 'status-valid' : 'status-invalid'}`;
+        statusDiv.textContent = activeTab.isValid ? 'Valid JSON' : 'Invalid JSON';
+        viewer.appendChild(statusDiv);
+
+        contentDiv.appendChild(viewer);
+    }
+
+
+    renderLargeJSON(activeTab, contentDiv, jsonText) {
+        // Show loading indicator
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading-indicator';
+        loadingDiv.innerHTML = '<div class="spinner"></div><p>Processing large file...</p>';
+        contentDiv.appendChild(loadingDiv);
+
+        // Use requestIdleCallback for progressive rendering
+        const renderCallback = () => {
+            const viewer = document.createElement('div');
+            const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
+            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
+
+            // Create containers
+            const jsonContent = document.createElement('div');
+            jsonContent.className = 'json-content';
+            
+            const lineNumbersDiv = document.createElement('div');
+            lineNumbersDiv.className = 'line-numbers';
+
+            // Process in chunks
+            const lines = jsonText.split('\n');
+            const CHUNK_SIZE = 1000;
+            let currentIndex = 0;
+
+            // Build collapsible regions and bracket levels once
+            if (lines.length > 0) {
+                this.collapsibleRegions = this.buildCollapsibleMap(lines);
+                if (this.settings.behavior.rainbowBrackets) {
+                    this.bracketLevels = this.calculateBracketLevels(lines);
+                }
+            }
+
+            const processChunk = () => {
+                const fragment = document.createDocumentFragment();
+                const lineNumberFragment = document.createDocumentFragment();
+                
+                const endIndex = Math.min(currentIndex + CHUNK_SIZE, lines.length);
+                
+                // Process lines in this chunk
+                for (let i = currentIndex; i < endIndex; i++) {
+                    const lineNumber = i + 1;
+                    const line = lines[i];
+                    
+                    // Create line element
+                    const lineDiv = document.createElement('div');
+                    lineDiv.className = 'json-line';
+                    lineDiv.setAttribute('data-line', lineNumber);
+                    lineDiv.innerHTML = this.highlightJsonLine(line, lineNumber);
+                    fragment.appendChild(lineDiv);
+                    
+                    // Create line number element with toggle if needed
+                    const isCollapsible = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
+                    if (isCollapsible) {
+                        const lineNumDiv = document.createElement('div');
+                        lineNumDiv.className = 'line-number-with-toggle';
+                        lineNumDiv.setAttribute('data-line', lineNumber);
+                        lineNumDiv.innerHTML = `
+                            <button class="gutter-toggle" data-line="${lineNumber}" onclick="app.toggleRegion(${lineNumber})">▼</button>
+                            <span class="line-num">${lineNumber}</span>
+                        `;
+                        lineNumberFragment.appendChild(lineNumDiv);
+                    } else {
+                        const lineNumDiv = document.createElement('div');
+                        lineNumDiv.className = 'line-number';
+                        lineNumDiv.setAttribute('data-line', lineNumber);
+                        lineNumDiv.innerHTML = `<span class="line-num">${lineNumber}</span>`;
+                        lineNumberFragment.appendChild(lineNumDiv);
+                    }
+                }
+                
+                // Append chunks to DOM
+                jsonContent.appendChild(fragment);
+                lineNumbersDiv.appendChild(lineNumberFragment);
+                
+                currentIndex = endIndex;
+                
+                // Update progress
+                const progress = Math.round((currentIndex / lines.length) * 100);
+                loadingDiv.querySelector('p').textContent = `Processing large file... ${progress}%`;
+                
+                // Continue processing or finish
+                if (currentIndex < lines.length) {
+                    requestIdleCallback(processChunk);
+                } else {
+                    // Remove loading indicator and add viewer
+                    contentDiv.removeChild(loadingDiv);
+                    
+                    viewer.appendChild(jsonContent);
+                    viewer.appendChild(lineNumbersDiv);
+                    
+                    // Set viewer classes
+                    const hasCollapsibleRegions = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
+                    viewer.classList.toggle('with-line-numbers', this.settings.behavior.showLineNumbers);
+                    viewer.classList.toggle('has-collapsible-regions', hasCollapsibleRegions);
+                    
+                    // Status indicator
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = `status-indicator ${activeTab.isValid ? 'status-valid' : 'status-invalid'}`;
+                    statusDiv.textContent = activeTab.isValid ? 'Valid JSON' : 'Invalid JSON';
+                    viewer.appendChild(statusDiv);
+                    
+                    contentDiv.appendChild(viewer);
+                }
+            };
+            
+            // Start processing
+            processChunk();
+        };
+
+        // Use requestIdleCallback with fallback
+        if (window.requestIdleCallback) {
+            requestIdleCallback(renderCallback);
+        } else {
+            setTimeout(renderCallback, 0);
+        }
+    }
+
+    renderVirtualJSON(activeTab, contentDiv, jsonText) {
+        // Show loading indicator
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading-indicator';
+        loadingDiv.innerHTML = '<div class="spinner"></div><p>Preparing virtual scrolling for very large file...</p>';
+        contentDiv.appendChild(loadingDiv);
+
+        setTimeout(() => {
+            const lines = jsonText.split('\n');
+            const totalLines = lines.length;
+            const VISIBLE_LINES = 100; // Number of lines to render at once
+            
+            // Get actual computed line height from CSS
+            const computedStyle = getComputedStyle(document.documentElement);
+            const fontSize = parseFloat(computedStyle.getPropertyValue('--font-size')) || 14;
+            const lineHeightRatio = parseFloat(computedStyle.getPropertyValue('--line-height')) || 1.4;
+            const LINE_HEIGHT = Math.ceil(fontSize * lineHeightRatio);
+            
+            // Build collapsible regions and bracket levels once
+            this.collapsibleRegions = this.buildCollapsibleMap(lines);
+            if (this.settings.behavior.rainbowBrackets) {
+                this.bracketLevels = this.calculateBracketLevels(lines);
+            }
+
+            // Create viewer with virtual scrolling
+            const viewer = document.createElement('div');
+            const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
+            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass} virtual-scroll`;
+            viewer.style.position = 'relative';
+            viewer.style.height = '100%';
+            viewer.style.overflow = 'auto';
+
+            // Create viewport container with correct height
+            const viewport = document.createElement('div');
+            const totalHeight = totalLines * LINE_HEIGHT;
+            viewport.style.height = `${totalHeight}px`;
+            viewport.style.position = 'relative';
+
+            // Create content container that will hold visible lines
+            const jsonContent = document.createElement('div');
+            jsonContent.className = 'json-content';
+            jsonContent.style.position = 'absolute';
+            jsonContent.style.width = '100%';
+
+            // Create line numbers container
+            const lineNumbersDiv = document.createElement('div');
+            lineNumbersDiv.className = 'line-numbers';
+            lineNumbersDiv.style.position = 'absolute';
+            lineNumbersDiv.style.width = '85px';
+
+            let currentStartLine = 0;
+            let renderTimeout;
+
+            const renderVisibleLines = () => {
+                clearTimeout(renderTimeout);
+                renderTimeout = setTimeout(() => {
+                    const scrollTop = viewer.scrollTop;
+                    const viewportHeight = viewer.clientHeight;
+                    
+                    // Calculate visible range with some buffer
+                    const startLine = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - 10);
+                    const visibleLines = Math.ceil(viewportHeight / LINE_HEIGHT) + 20; // Add buffer
+                    const endLine = Math.min(startLine + visibleLines, totalLines);
+
+                    // Clear current content
+                    jsonContent.innerHTML = '';
+                    lineNumbersDiv.innerHTML = '';
+
+                    // Set position based on scroll
+                    jsonContent.style.top = `${startLine * LINE_HEIGHT}px`;
+                    lineNumbersDiv.style.top = `${startLine * LINE_HEIGHT}px`;
+
+                    // Render visible lines
+                    const fragment = document.createDocumentFragment();
+                    const lineNumberFragment = document.createDocumentFragment();
+
+                    for (let i = startLine; i < endLine; i++) {
+                        const lineNumber = i + 1;
+                        const line = lines[i];
+
+                        // Create line element
+                        const lineDiv = document.createElement('div');
+                        lineDiv.className = 'json-line';
+                        lineDiv.setAttribute('data-line', lineNumber);
+                        lineDiv.style.height = `${LINE_HEIGHT}px`;
+                        lineDiv.style.lineHeight = `${LINE_HEIGHT}px`;
+                        lineDiv.style.margin = '0';
+                        lineDiv.style.padding = '0';
+                        lineDiv.innerHTML = this.highlightJsonLine(line, lineNumber);
+                        fragment.appendChild(lineDiv);
+
+                        // Create line number element
+                        const isCollapsible = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
+                        if (isCollapsible) {
+                            const lineNumDiv = document.createElement('div');
+                            lineNumDiv.className = 'line-number-with-toggle';
+                            lineNumDiv.setAttribute('data-line', lineNumber);
+                            lineNumDiv.style.height = `${LINE_HEIGHT}px`;
+                            lineNumDiv.innerHTML = `
+                                <button class="gutter-toggle" data-line="${lineNumber}" onclick="app.toggleRegion(${lineNumber})">▼</button>
+                                <span class="line-num">${lineNumber}</span>
+                            `;
+                            lineNumberFragment.appendChild(lineNumDiv);
+                        } else {
+                            const lineNumDiv = document.createElement('div');
+                            lineNumDiv.className = 'line-number';
+                            lineNumDiv.setAttribute('data-line', lineNumber);
+                            lineNumDiv.style.height = `${LINE_HEIGHT}px`;
+                            lineNumDiv.innerHTML = `<span class="line-num">${lineNumber}</span>`;
+                            lineNumberFragment.appendChild(lineNumDiv);
+                        }
+                    }
+
+                    jsonContent.appendChild(fragment);
+                    lineNumbersDiv.appendChild(lineNumberFragment);
+                }, 10); // Small debounce
+            };
+
+            // Set up scroll listener
+            viewer.addEventListener('scroll', renderVisibleLines);
+
+            // Assemble the viewer
+            viewport.appendChild(jsonContent);
+            viewport.appendChild(lineNumbersDiv);
+            viewer.appendChild(viewport);
+
+            // Remove loading and add viewer
+            contentDiv.removeChild(loadingDiv);
+            
+            // Set viewer classes
+            const hasCollapsibleRegions = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
+            viewer.classList.toggle('with-line-numbers', this.settings.behavior.showLineNumbers);
+            viewer.classList.toggle('has-collapsible-regions', hasCollapsibleRegions);
+            
+            // Status indicator
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status-indicator ${activeTab.isValid ? 'status-valid' : 'status-invalid'}`;
+            statusDiv.textContent = `${activeTab.isValid ? 'Valid' : 'Invalid'} JSON (${totalLines.toLocaleString()} lines)`;
+            viewer.appendChild(statusDiv);
+            
+            contentDiv.appendChild(viewer);
+
+            // Initial render
+            renderVisibleLines();
+        }, 0);
+    }
+
     renderJSON(data, level = 0, isRoot = true, path = '') {
         // Generate clean JSON text with proper indentation
-        const jsonText = JSON.stringify(data, null, 2);
+        const indentSize = this.settings.behavior.indentSize || 2;
+        const jsonText = JSON.stringify(data, null, indentSize);
         const lines = jsonText.split('\n');
         console.log('renderJSON: Processing', lines.length, 'lines');
+        
         
         // Build map of collapsible regions (preserve existing state)
         const newRegions = this.buildCollapsibleMap(lines);
@@ -417,7 +725,12 @@ class JSONViewer {
                 collapsedIndicator = ' collapsed-region';
             }
             
-            return `<div class="json-line${hiddenClass}${collapsedIndicator}" data-line="${lineNumber}">${highlighted}</div>`;
+            const result = `<div class="json-line${hiddenClass}${collapsedIndicator}" data-line="${lineNumber}">${highlighted}</div>`;
+            if (lineNumber === 6) {
+                console.log('Line 6 HTML:', result);
+                console.log('Line 6 raw:', line);
+            }
+            return result;
         });
         
         return htmlLines.join('');
@@ -426,6 +739,8 @@ class JSONViewer {
     calculateBracketLevels(lines) {
         const bracketLevels = {};
         let currentLevel = 0;
+        const bracketStack = []; // Stack to track opening brackets and their colors
+        let arrayElementIndices = []; // Track element index at each array level
         
         lines.forEach((line, index) => {
             const lineNumber = index + 1;
@@ -434,16 +749,70 @@ class JSONViewer {
             // Store bracket info for this line
             const brackets = [];
             
-            // Count brackets in this line
+            // Check if this line starts a new array element (excluding the array opening line itself)
+            if (arrayElementIndices.length > 0 && 
+                (trimmedLine.startsWith('{') || trimmedLine.startsWith('[') || 
+                 /^"/.test(trimmedLine) || /^\d+/.test(trimmedLine) ||
+                 trimmedLine.startsWith('true') || trimmedLine.startsWith('false') || 
+                 trimmedLine.startsWith('null'))) {
+                
+                // Look at previous line to see if it ended with a comma (new element) or was the array opening
+                if (index > 0) {
+                    const prevLine = lines[index - 1].trim();
+                    if (prevLine.endsWith(',')) {
+                        // Increment the element index for the current array
+                        arrayElementIndices[arrayElementIndices.length - 1]++;
+                    }
+                }
+            }
+            
+            // Process each character in the line
             for (let i = 0; i < line.length; i++) {
                 const char = line[i];
                 
                 if (char === '{' || char === '[') {
-                    brackets.push({ char, level: currentLevel, position: i });
+                    // Calculate color level
+                    let colorLevel = currentLevel;
+                    
+                    // If we're inside an array, add the current element index
+                    if (arrayElementIndices.length > 0) {
+                        const currentElementIndex = arrayElementIndices[arrayElementIndices.length - 1];
+                        colorLevel = currentLevel + currentElementIndex;
+                    }
+                    
+                    brackets.push({ char, level: colorLevel, position: i });
+                    
+                    // Push bracket info to stack for matching closing bracket
+                    bracketStack.push({
+                        char: char,
+                        level: colorLevel,
+                        depth: currentLevel,
+                        isArray: char === '['
+                    });
+                    
+                    // If opening an array, add a new element index counter
+                    if (char === '[') {
+                        arrayElementIndices.push(0);
+                    }
+                    
                     currentLevel++;
+                    
                 } else if (char === '}' || char === ']') {
                     currentLevel = Math.max(0, currentLevel - 1);
-                    brackets.push({ char, level: currentLevel, position: i });
+                    
+                    // Pop the matching opening bracket to get the same color
+                    if (bracketStack.length > 0) {
+                        const matchingBracket = bracketStack.pop();
+                        brackets.push({ char, level: matchingBracket.level, position: i });
+                        
+                        // If closing an array, remove its element index counter
+                        if (char === ']' && arrayElementIndices.length > 0) {
+                            arrayElementIndices.pop();
+                        }
+                    } else {
+                        // Fallback if stack is empty (shouldn't happen with valid JSON)
+                        brackets.push({ char, level: currentLevel, position: i });
+                    }
                 }
             }
             
@@ -500,12 +869,56 @@ class JSONViewer {
                         
                         // Only create collapsible region if there's content between brackets
                         if (lineNumber > opening.lineNumber + 1) {
+                            // Count items between start and end
+                            let itemCount = 0;
+                            const isArray = opening.char === '[';
+                            
+                            if (isArray) {
+                                // For arrays, count direct child items
+                                let depth = 0;
+                                for (let i = opening.lineNumber; i < lineNumber - 1; i++) {
+                                    const line = lines[i].trim();
+                                    
+                                    // Track depth to only count direct children
+                                    if (line.includes('{') || line.includes('[')) depth++;
+                                    if (line.includes('}') || line.includes(']')) depth--;
+                                    
+                                    // Count items at depth 1 (direct children of this array)
+                                    if (depth === 1) {
+                                        // Count opening brackets of direct child objects/arrays
+                                        if (line === '{' || line === '[' || line.startsWith('{') || line.startsWith('[')) {
+                                            itemCount++;
+                                        }
+                                        // Count primitive values (strings, numbers, etc) that are direct children
+                                        else if (depth === 0 && line.match(/^["'\d\-true\false\null]/)) {
+                                            itemCount++;
+                                        }
+                                    }
+                                }
+                            } else {
+                                // For objects, count properties (lines with colons at the right depth)
+                                let depth = 0;
+                                for (let i = opening.lineNumber; i < lineNumber - 1; i++) {
+                                    const line = lines[i].trim();
+                                    
+                                    // Count lines with colons at depth 0 (direct properties)
+                                    if (depth === 0 && line.includes('":')) {
+                                        itemCount++;
+                                    }
+                                    
+                                    // Track depth
+                                    if (line.includes('{') || line.includes('[')) depth++;
+                                    if (line.includes('}') || line.includes(']')) depth--;
+                                }
+                            }
+                            
                             collapsibleRegions[opening.lineNumber] = {
                                 startLine: opening.lineNumber,
                                 endLine: lineNumber,
                                 type: opening.char === '{' ? 'object' : 'array',
                                 collapsed: false,
-                                indentLevel: opening.indentLevel
+                                indentLevel: opening.indentLevel,
+                                itemCount: itemCount
                             };
                         }
                         
@@ -577,6 +990,17 @@ class JSONViewer {
             // Standard bracket highlighting
             highlighted = highlighted.replace(/[\[\]]/g, '<span class="json-array-bracket">$&</span>');
             highlighted = highlighted.replace(/[{}]/g, '<span class="json-object-bracket">$&</span>');
+        }
+        
+        // Add type badges for collapsed regions
+        if (this.collapsibleRegions && this.collapsibleRegions[lineNumber] && this.collapsibleRegions[lineNumber].collapsed) {
+            const region = this.collapsibleRegions[lineNumber];
+            const badgeClass = region.type === 'array' ? 'array-badge' : 'object-badge';
+            const badgeText = region.type === 'array' ? `[${region.itemCount}]` : `{${region.itemCount}}`;
+            
+            // Insert badge after the opening bracket
+            const bracketChar = region.type === 'array' ? '\\[' : '\\{';
+            highlighted = highlighted.replace(new RegExp(`(<span[^>]*>${bracketChar}</span>)`), `$1<span class="type-badge ${badgeClass}">${badgeText}</span>`);
         }
         
         // Then apply search highlighting on top
@@ -653,7 +1077,7 @@ class JSONViewer {
     generateLineNumbers(jsonData, hideNumbers = false) {
         if (!jsonData) return '';
         // Generate line numbers based on actual JSON lines
-        const jsonText = JSON.stringify(jsonData, null, 2);
+        const jsonText = JSON.stringify(jsonData, null, this.settings.behavior.indentSize || 2);
         const lines = jsonText.split('\n');
         console.log('generateLineNumbers: Processing', lines.length, 'lines');
         
@@ -684,7 +1108,7 @@ class JSONViewer {
                     ${numberDisplay}
                 </div>`;
             } else {
-                const numberDisplay = hideNumbers ? '' : lineNumber;
+                const numberDisplay = hideNumbers ? '' : `<span class="line-num">${lineNumber}</span>`;
                 return `<div class="line-number${hiddenClass}" data-line="${lineNumber}">${numberDisplay}</div>`;
             }
         }).join('');
@@ -696,7 +1120,14 @@ class JSONViewer {
         const div = document.createElement('div');
         div.textContent = text;
         // textContent/innerHTML doesn't escape quotes, so we need to do it manually
-        return div.innerHTML.replace(/"/g, '&quot;');
+        let escaped = div.innerHTML.replace(/"/g, '&quot;');
+        
+        // Always add whitespace spans, CSS controls visibility
+        escaped = escaped
+            .replace(/ /g, '<span class="whitespace-dot"></span>')  // Replace spaces with spans
+            .replace(/\t/g, '<span class="whitespace-tab"></span>'); // Replace tabs with spans
+        
+        return escaped;
     }
 
     loadJsonFromFile(content, fileName) {
@@ -710,6 +1141,13 @@ class JSONViewer {
 
         const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
         if (!activeTab) return;
+
+        // Check file size
+        const sizeInMB = new Blob([content]).size / (1024 * 1024);
+        if (sizeInMB > 10) {
+            const proceed = confirm(`This file is ${sizeInMB.toFixed(2)} MB. Large files may take time to process. Continue?`);
+            if (!proceed) return;
+        }
 
         try {
             const jsonData = JSON.parse(content);
@@ -805,14 +1243,78 @@ class JSONViewer {
         
         console.log('Toggled region at line', lineNumber, 'collapsed:', region.collapsed);
         
-        // Update the view to reflect the changes
-        this.updateActiveTabView();
+        // Update only the affected lines without full re-render
+        this.updateCollapsedRegion(lineNumber, region);
+    }
+    
+    updateCollapsedRegion(lineNumber, region) {
+        // Update the toggle button icon
+        const toggleButton = document.querySelector(`button.gutter-toggle[data-line="${lineNumber}"]`);
+        if (toggleButton) {
+            toggleButton.textContent = region.collapsed ? '▶' : '▼';
+        }
+        
+        // Update the collapsed indicator on the line
+        const jsonLine = document.querySelector(`.json-line[data-line="${lineNumber}"]`);
+        const lineNumberDiv = document.querySelector(`.line-number[data-line="${lineNumber}"], .line-number-with-toggle[data-line="${lineNumber}"]`);
+        
+        if (region.collapsed) {
+            // Add collapsed indicators
+            if (jsonLine) jsonLine.classList.add('collapsed-region');
+            if (lineNumberDiv) lineNumberDiv.classList.add('collapsed-region');
+            
+            // Hide lines in the collapsed region
+            for (let i = region.startLine + 1; i <= region.endLine; i++) {
+                const hideLine = document.querySelector(`.json-line[data-line="${i}"]`);
+                const hideLineNumber = document.querySelector(`.line-number[data-line="${i}"], .line-number-with-toggle[data-line="${i}"]`);
+                if (hideLine) hideLine.classList.add('json-line-hidden');
+                if (hideLineNumber) {
+                    hideLineNumber.classList.add('json-line-hidden');
+                }
+            }
+            
+            // Update type badge if needed
+            if (jsonLine && this.settings.behavior.showDataTypes !== false) {
+                const badgeClass = region.type === 'array' ? 'array-badge' : 'object-badge';
+                const badgeText = region.type === 'array' ? `[${region.itemCount}]` : `{${region.itemCount}}`;
+                
+                // Check if badge already exists
+                let badge = jsonLine.querySelector('.type-badge');
+                if (!badge) {
+                    // Find the opening bracket and add badge after it
+                    const bracketClass = region.type === 'array' ? 'json-array-bracket' : 'json-object-bracket';
+                    const bracket = jsonLine.querySelector(`.${bracketClass}`);
+                    if (bracket) {
+                        badge = document.createElement('span');
+                        badge.className = `type-badge ${badgeClass}`;
+                        badge.textContent = badgeText;
+                        bracket.insertAdjacentElement('afterend', badge);
+                    }
+                }
+            }
+        } else {
+            // Remove collapsed indicators
+            if (jsonLine) jsonLine.classList.remove('collapsed-region');
+            if (lineNumberDiv) lineNumberDiv.classList.remove('collapsed-region');
+            
+            // Show lines in the expanded region
+            for (let i = region.startLine + 1; i <= region.endLine; i++) {
+                const showLine = document.querySelector(`.json-line[data-line="${i}"]`);
+                const showLineNumber = document.querySelector(`.line-number[data-line="${i}"], .line-number-with-toggle[data-line="${i}"]`);
+                if (showLine) showLine.classList.remove('json-line-hidden');
+                if (showLineNumber) {
+                    showLineNumber.classList.remove('json-line-hidden');
+                }
+            }
+            
+            // Remove type badge
+            if (jsonLine) {
+                const badge = jsonLine.querySelector('.type-badge');
+                if (badge) badge.remove();
+            }
+        }
     }
 
-    toggleNode(nodeId) {
-        // Legacy method - now redirects to toggleRegion
-        console.log('toggleNode called for:', nodeId);
-    }
 
     expandAll() {
         if (!this.collapsibleRegions) {
@@ -1142,72 +1644,7 @@ class JSONViewer {
         });
     }
 
-    expandPathToResult(path) {
-        // Parse the path and expand all parent nodes
-        const pathParts = this.parseJsonPath(path);
-        let currentPath = '';
 
-        pathParts.forEach((part, index) => {
-            if (index === 0) {
-                currentPath = part;
-            } else {
-                currentPath += part.startsWith('[') ? part : '.' + part;
-            }
-
-            // Find and expand the node at this path
-            const nodeId = `node-${currentPath}`;
-            const node = document.querySelector(`[data-node-id="${nodeId}"]`);
-
-            if (node) {
-                const children = node.querySelector('.json-children');
-                const toggle = node.querySelector('.json-toggle');
-
-                if (children && toggle && children.classList.contains('json-collapsed')) {
-                    // Expand this node
-                    children.classList.remove('json-collapsed');
-                    toggle.textContent = '▼';
-                }
-            }
-        });
-    }
-
-    parseJsonPath(path) {
-        // Parse a JSON path like "users[0].name" into ["users", "[0]", "name"]
-        const parts = [];
-        let current = '';
-        let inBrackets = false;
-
-        for (let i = 0; i < path.length; i++) {
-            const char = path[i];
-
-            if (char === '[') {
-                if (current) {
-                    parts.push(current);
-                    current = '';
-                }
-                inBrackets = true;
-                current = char;
-            } else if (char === ']') {
-                current += char;
-                parts.push(current);
-                current = '';
-                inBrackets = false;
-            } else if (char === '.' && !inBrackets) {
-                if (current) {
-                    parts.push(current);
-                    current = '';
-                }
-            } else {
-                current += char;
-            }
-        }
-
-        if (current) {
-            parts.push(current);
-        }
-
-        return parts;
-    }
 
     showWelcome() {
         document.getElementById('welcome').style.display = 'flex';
@@ -1256,6 +1693,7 @@ class JSONViewer {
         document.getElementById('showDataTypes').checked = this.settings.behavior.showDataTypes;
         document.getElementById('highlightMatches').checked = this.settings.behavior.highlightMatches;
         document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
+        document.getElementById('showWhitespace').checked = this.settings.behavior.showWhitespace;
 
         // Sync settings panel checkboxes
         const settingsArrayIndices = document.getElementById('showArrayIndices');
@@ -1326,7 +1764,23 @@ class JSONViewer {
         this.applyTheme();
         this.applyFontSettings();
         this.applyColorSettings();
+        this.applyBehaviorSettings();
         this.updateUI();
+    }
+    
+    applyBehaviorSettings() {
+        // Apply whitespace visibility
+        document.body.classList.toggle('show-whitespace', this.settings.behavior.showWhitespace);
+        
+        // Apply line numbers visibility
+        document.body.classList.toggle('show-line-numbers', this.settings.behavior.showLineNumbers);
+        
+        // Apply word wrap
+        const viewers = document.querySelectorAll('.json-viewer');
+        viewers.forEach(viewer => {
+            viewer.classList.toggle('word-wrap', this.settings.behavior.wordWrap);
+            viewer.classList.toggle('with-line-numbers', this.settings.behavior.showLineNumbers);
+        });
     }
 
     applyTheme() {
@@ -1363,47 +1817,31 @@ class JSONViewer {
         }
     }
 
-    // Store expansion state before re-rendering
-    saveExpansionState() {
-        const state = {};
-        document.querySelectorAll('.json-node[data-node-id]').forEach(node => {
-            const nodeId = node.getAttribute('data-node-id');
-            const children = node.querySelector('.json-children');
-            state[nodeId] = !children.classList.contains('json-collapsed');
-        });
-        return state;
-    }
-
-    // Restore expansion state after re-rendering
-    restoreExpansionState(state) {
-        // Wait for next tick to ensure DOM is updated
-        setTimeout(() => {
-            Object.keys(state).forEach(nodeId => {
-                const node = document.querySelector(`[data-node-id="${nodeId}"]`);
-                if (node) {
-                    const children = node.querySelector('.json-children');
-                    const toggle = node.querySelector('.json-toggle');
-                    if (children && toggle) {
-                        if (state[nodeId]) {
-                            // Should be expanded
-                            children.classList.remove('json-collapsed');
-                            toggle.textContent = '▼';
-                        } else {
-                            // Should be collapsed
-                            children.classList.add('json-collapsed');
-                            toggle.textContent = '▶';
-                        }
-                    }
-                }
-            });
-        }, 0);
-    }
 
     updateActiveTabViewPreservingState() {
         if (this.activeTabId) {
-            const state = this.saveExpansionState();
+            // Save current scroll position
+            const viewer = document.querySelector('.json-viewer');
+            const scrollTop = viewer ? viewer.scrollTop : 0;
+            const scrollLeft = viewer ? viewer.scrollLeft : 0;
+            
+            // Temporarily disable smooth scrolling
+            viewer.style.scrollBehavior = 'auto';
+            
+            // Update the content
             this.updateContentUI();
-            this.restoreExpansionState(state);
+            
+            // Force immediate scroll restoration
+            const updatedViewer = document.querySelector('.json-viewer');
+            if (updatedViewer) {
+                updatedViewer.scrollTop = scrollTop;
+                updatedViewer.scrollLeft = scrollLeft;
+                
+                // Re-enable smooth scrolling after a moment
+                setTimeout(() => {
+                    updatedViewer.style.scrollBehavior = '';
+                }, 100);
+            }
         }
     }
 }

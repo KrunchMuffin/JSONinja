@@ -360,8 +360,20 @@ body {
   overflow-x: auto;
 }
 
+.json-content {
+  font-family: var(--font-mono);
+  white-space: pre;
+  tab-size: 2;  /* In case any tabs slip through */
+}
+
 .json-line {
   /* Individual JSON line styling */
+  white-space: pre;  /* Preserve indentation spaces */
+  font-family: inherit;
+  line-height: var(--line-height);
+  min-height: var(--line-height);
+  padding: 0;
+  margin: 0;
 }
 
 .json-line-hidden,
@@ -377,29 +389,38 @@ body {
 .line-numbers {
   position: absolute;
   left: 0;
-  top: 16px;
-  width: 50px;
-  min-height: 100%;
-  padding-right: 8px;
+  top: 16px; /* Match the json-viewer padding to align with content */
+  width: 90px; /* Wide enough for fold button + 4-digit line numbers */
+  min-height: calc(100% - 32px); /* Adjust height for top and bottom padding */
   border-right: 1px solid var(--border-color);
-  text-align: right;
   color: var(--text-secondary);
   font-size: var(--font-size);
   line-height: var(--line-height);
-  font-family: var(--font-family);
+  font-family: var(--font-mono);
   user-select: none;
   overflow: visible;
 }
 
-.line-number,
-.line-number-with-toggle {
+.line-number {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  width: 100%;
+  padding-right: 12px;
   height: calc(var(--font-size) * var(--line-height));
   line-height: var(--line-height);
-  position: relative;
+}
+
+.line-number-with-toggle {
+  display: flex;
+  align-items: center;
+  height: calc(var(--font-size) * var(--line-height));
+  line-height: var(--line-height);
+  padding-right: 12px;
+  gap: 4px;
+}
+
+.line-number-with-toggle .gutter-toggle {
+  flex-shrink: 0;
 }
 
 .line-number-with-toggle .line-num {
@@ -408,10 +429,6 @@ body {
 }
 
 .gutter-toggle {
-  position: absolute;
-  left: 0px;
-  top: 50%;
-  transform: translateY(-50%);
   width: 12px;
   height: 12px;
   background: none;
@@ -424,7 +441,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
 }
 
 .gutter-toggle:hover {
@@ -439,22 +455,111 @@ body {
   opacity: 0.8;
 }
 
+.line-number.collapsed-region,
 .line-number-with-toggle.collapsed-region {
   background-color: var(--bg-tertiary);
   border-bottom: 1px solid var(--text-secondary);
 }
 
 .json-viewer.with-line-numbers .json-content {
-  margin-left: 60px;
+  margin-left: 95px; /* Space for line numbers gutter + border */
 }
 
 /* When only showing gutter toggles without line numbers */
 .json-viewer:not(.with-line-numbers) .json-content {
-  margin-left: 30px;
+  margin-left: 35px; /* Slightly increased for better alignment */
 }
 
 .json-viewer:not(.with-line-numbers) .line-numbers {
-  width: 25px;
+  width: 30px; /* Increased to ensure toggle buttons don't overlap */
+}
+
+/* When line numbers are hidden and no collapsible regions, adjust content */
+body:not(.show-line-numbers) .json-viewer.with-line-numbers:not(.has-collapsible-regions) .json-content {
+  margin-left: 16px !important; /* Override the with-line-numbers margin */
+}
+
+/* Hide line numbers gutter when not needed */
+body:not(.show-line-numbers) .json-viewer.with-line-numbers:not(.has-collapsible-regions) .line-numbers {
+  display: none !important;
+}
+
+/* Line number text alignment */
+.line-num {
+  text-align: end;
+}
+
+/* Hide line numbers when disabled */
+body:not(.show-line-numbers) .line-num {
+  display: none;
+}
+
+/* When line numbers are hidden but there are collapsible regions, keep narrow gutter */
+body:not(.show-line-numbers) .json-viewer.has-collapsible-regions .line-numbers {
+  width: 25px !important; /* Just enough for fold buttons */
+  /* Keep border-right for visual separation */
+  background: var(--bg-primary) !important; /* Match background */
+  left: 0 !important;
+}
+
+body:not(.show-line-numbers) .json-viewer.has-collapsible-regions .json-content {
+  margin-left: 35px !important; /* Space for fold buttons + border */
+}
+
+/* Type badges for objects and arrays */
+.type-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.75em;
+  font-weight: normal;
+  color: var(--text-secondary);
+  background-color: var(--bg-tertiary);
+  border-radius: 10px;
+  opacity: 0.7;
+  vertical-align: middle;
+  font-family: var(--font-mono);
+}
+
+.type-badge.array-badge {
+  color: var(--search-bg);
+}
+
+.type-badge.object-badge {
+  color: var(--bracket-1);
+}
+
+/* Only show badges on collapsed lines */
+.json-line:not(.collapsed-region) .type-badge {
+  display: none;
+}
+
+/* Whitespace visualization */
+.whitespace-dot,
+.whitespace-tab {
+  display: inline-block;
+  width: 1ch; /* Preserve the width of one character */
+  opacity: 0.3;
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+/* By default, show a space */
+.whitespace-dot::before {
+  content: ' ';
+}
+
+.whitespace-tab::before {
+  content: '  '; /* Two spaces for tab */
+}
+
+/* When whitespace is shown, display the dots/tabs */
+body.show-whitespace .whitespace-dot::before {
+  content: '·';
+}
+
+body.show-whitespace .whitespace-tab::before {
+  content: '→';
 }
 
 /* Word wrap control */
@@ -472,8 +577,6 @@ body {
 .json-key {
   color: var(--json-key);
   font-weight: normal;
-  padding-left: 40px;
-  line-height: 1.5rem;
 }
 
 .json-array-index {
@@ -484,9 +587,6 @@ body {
   display: inline-block;
 }
 
-.json-children {
-  padding-left: 0; /* Remove CSS padding - JavaScript handles indentation */
-}
 
 .json-length-badge {
   color: var(--text-secondary);
@@ -502,10 +602,6 @@ body {
   opacity: 0.8;
 }
 
-/* Hide closing brackets when parent children are collapsed */
-.json-children.json-collapsed + .json-closing-bracket {
-  display: none;
-}
 
 .json-string {
   color: var(--json-string);
@@ -540,31 +636,6 @@ body {
   font-weight: bold;
 }
 
-/* JSON tree styles */
-.json-node {
-  margin-left: 16px;
-}
-
-.json-node.root {
-  margin-left: 0;
-}
-
-.json-expandable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.json-toggle {
-  display: inline-block;
-  width: 16px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-weight: bold;
-}
-
-.json-children.json-collapsed {
-  display: none;
-}
 
 .json-type-badge {
   display: inline-block;
@@ -878,6 +949,34 @@ body {
   background-color: #331010;
   border-color: #f44336;
   color: #f48fb1;
+}
+
+/* Loading indicator */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+}
+
+.loading-indicator p {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--bg-tertiary);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Full-screen mode */
