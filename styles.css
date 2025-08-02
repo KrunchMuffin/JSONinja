@@ -405,7 +405,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 12px;
+  padding-right: 6px;
   height: calc(var(--font-size) * var(--line-height));
   line-height: var(--line-height);
 }
@@ -415,7 +415,7 @@ body {
   align-items: center;
   height: calc(var(--font-size) * var(--line-height));
   line-height: var(--line-height);
-  padding-right: 12px;
+  padding-right: 6px;
   gap: 4px;
 }
 
@@ -562,25 +562,6 @@ body.show-whitespace .whitespace-tab::before {
   content: '→';
 }
 
-/* Word wrap control */
-.json-viewer.word-wrap {
-  white-space: pre-wrap !important; /* Enable wrapping when class is present */
-  overflow-x: auto; /* Still allow horizontal scroll if needed */
-}
-
-.json-viewer.word-wrap .json-content {
-  white-space: pre-wrap !important; /* Override json-content's pre setting */
-}
-
-.json-viewer.word-wrap .json-line {
-  white-space: pre-wrap !important; /* Override the json-line's pre setting */
-}
-
-.json-viewer.word-wrap .json-string,
-.json-viewer.word-wrap .json-key {
-  word-break: break-word; /* Allow long strings to break */
-  overflow-wrap: break-word; /* Alternative property for better support */
-}
 
 /* JSON syntax highlighting */
 .json-key {

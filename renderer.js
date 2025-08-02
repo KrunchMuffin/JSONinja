@@ -30,7 +30,6 @@ class JSONViewer {
                 showDataTypes: true,
                 highlightMatches: true,
                 showLineNumbers: true,
-                wordWrap: false,
                 rainbowBrackets: false,
                 showStringLength: false,  // Show character count for long strings
                 showArrayIndices: true,   // Show [0], [1] indices for array items
@@ -78,16 +77,6 @@ class JSONViewer {
                 const hasCollapsible = this.collapsibleRegions && Object.keys(this.collapsibleRegions).length > 0;
                 viewer.classList.toggle('has-collapsible-regions', hasCollapsible);
             }
-        });
-        document.getElementById('wordWrap').addEventListener('change', (e) => {
-            this.settings.behavior.wordWrap = e.target.checked;
-            // Apply to ALL viewers (in case of multiple tabs)
-            const viewers = document.querySelectorAll('.json-viewer');
-            viewers.forEach(viewer => {
-                viewer.classList.toggle('word-wrap', e.target.checked);
-            });
-            // Save the setting
-            this.saveSettings();
         });
 
         // Quick settings
@@ -412,9 +401,7 @@ class JSONViewer {
 
     renderNormalJSON(activeTab, contentDiv) {
         const viewer = document.createElement('div');
-        // Add word-wrap class based on settings
-        const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
-        viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
+        viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''}`;
 
         const jsonContent = document.createElement('div');
         jsonContent.className = 'json-content';
@@ -453,8 +440,7 @@ class JSONViewer {
         // Use requestIdleCallback for progressive rendering
         const renderCallback = () => {
             const viewer = document.createElement('div');
-            const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
-            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass}`;
+            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''}`;
 
             // Create containers
             const jsonContent = document.createElement('div');
@@ -587,8 +573,7 @@ class JSONViewer {
 
             // Create viewer with virtual scrolling
             const viewer = document.createElement('div');
-            const wrapClass = this.settings.behavior.wordWrap ? 'word-wrap' : '';
-            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} ${wrapClass} virtual-scroll`;
+            viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} virtual-scroll`;
             viewer.style.position = 'relative';
             viewer.style.height = '100%';
             viewer.style.overflow = 'auto';
@@ -1805,7 +1790,6 @@ class JSONViewer {
         // Apply word wrap
         const viewers = document.querySelectorAll('.json-viewer');
         viewers.forEach(viewer => {
-            viewer.classList.toggle('word-wrap', this.settings.behavior.wordWrap);
             viewer.classList.toggle('with-line-numbers', this.settings.behavior.showLineNumbers);
         });
     }
@@ -1832,7 +1816,6 @@ class JSONViewer {
     updateUI() {
         // Update behavior-related UI elements
         document.getElementById('showLineNumbers').checked = this.settings.behavior.showLineNumbers;
-        document.getElementById('wordWrap').checked = this.settings.behavior.wordWrap;
         document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
 
         this.updateActiveTabView();
