@@ -360,6 +360,12 @@ body {
   overflow-x: auto;
 }
 
+/* Virtual scroll viewers should not flex-grow */
+.json-viewer.virtual-scroll {
+  flex: none;
+  height: 100%;
+}
+
 .json-content {
   font-family: var(--font-mono);
   white-space: pre;

@@ -556,14 +556,32 @@ class JSONViewer {
 
         setTimeout(() => {
             const lines = jsonText.split('\n');
+            // Count and remove empty lines at the end
+            let emptyLinesRemoved = 0;
+            while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+                lines.pop();
+                emptyLinesRemoved++;
+            }
             const totalLines = lines.length;
             const VISIBLE_LINES = 100; // Number of lines to render at once
+            
+            // Find last non-empty line
+            let lastNonEmptyLine = totalLines;
+            for (let i = totalLines - 1; i >= 0; i--) {
+                if (lines[i].trim() !== '') {
+                    lastNonEmptyLine = i + 1;
+                    break;
+                }
+            }
+            
+            console.log(`Virtual scrolling: ${lastNonEmptyLine} actual content lines out of ${totalLines} total (removed ${emptyLinesRemoved} trailing empty lines)`);
             
             // Get actual computed line height from CSS
             const computedStyle = getComputedStyle(document.documentElement);
             const fontSize = parseFloat(computedStyle.getPropertyValue('--font-size')) || 14;
             const lineHeightRatio = parseFloat(computedStyle.getPropertyValue('--line-height')) || 1.4;
             const LINE_HEIGHT = Math.ceil(fontSize * lineHeightRatio);
+            console.log(`Line height calculated: ${LINE_HEIGHT}px (font: ${fontSize}px, ratio: ${lineHeightRatio})`);
             
             // Build collapsible regions and bracket levels once
             this.collapsibleRegions = this.buildCollapsibleMap(lines);
@@ -576,13 +594,17 @@ class JSONViewer {
             viewer.className = `json-viewer ${this.settings.behavior.showLineNumbers ? 'with-line-numbers' : ''} virtual-scroll`;
             viewer.style.position = 'relative';
             viewer.style.height = '100%';
+            viewer.style.maxHeight = '100%'; // Don't exceed container
             viewer.style.overflow = 'auto';
 
             // Create viewport container with correct height
             const viewport = document.createElement('div');
-            const totalHeight = totalLines * LINE_HEIGHT;
+            // Use the last non-empty line to calculate height
+            const actualContentLines = lastNonEmptyLine;
+            const totalHeight = actualContentLines * LINE_HEIGHT;
             viewport.style.height = `${totalHeight}px`;
             viewport.style.position = 'relative';
+            console.log(`Viewport height: ${totalHeight}px for ${actualContentLines} content lines`);
 
             // Create content container that will hold visible lines
             const jsonContent = document.createElement('div');
@@ -590,11 +612,19 @@ class JSONViewer {
             jsonContent.style.position = 'absolute';
             jsonContent.style.width = '100%';
 
-            // Create line numbers container
+            // Create line numbers container with overflow hidden
+            const lineNumbersContainer = document.createElement('div');
+            lineNumbersContainer.style.position = 'absolute';
+            lineNumbersContainer.style.left = '0';
+            lineNumbersContainer.style.top = '0';
+            lineNumbersContainer.style.width = '85px';
+            lineNumbersContainer.style.height = '100%';
+            lineNumbersContainer.style.overflow = 'hidden';
+            
             const lineNumbersDiv = document.createElement('div');
             lineNumbersDiv.className = 'line-numbers';
             lineNumbersDiv.style.position = 'absolute';
-            lineNumbersDiv.style.width = '85px';
+            lineNumbersDiv.style.width = '100%';
 
             let currentStartLine = 0;
             let renderTimeout;
@@ -608,7 +638,12 @@ class JSONViewer {
                     // Calculate visible range with some buffer
                     const startLine = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - 10);
                     const visibleLines = Math.ceil(viewportHeight / LINE_HEIGHT) + 20; // Add buffer
-                    const endLine = Math.min(startLine + visibleLines, totalLines);
+                    const endLine = Math.min(startLine + visibleLines, lastNonEmptyLine);
+                    
+                    // Don't render beyond actual content
+                    if (startLine >= lastNonEmptyLine) {
+                        return;
+                    }
 
                     // Clear current content
                     jsonContent.innerHTML = '';
@@ -668,8 +703,9 @@ class JSONViewer {
             viewer.addEventListener('scroll', renderVisibleLines);
 
             // Assemble the viewer
+            lineNumbersContainer.appendChild(lineNumbersDiv);
             viewport.appendChild(jsonContent);
-            viewport.appendChild(lineNumbersDiv);
+            viewport.appendChild(lineNumbersContainer);
             viewer.appendChild(viewport);
 
             // Remove loading and add viewer
@@ -683,7 +719,7 @@ class JSONViewer {
             // Status indicator
             const statusDiv = document.createElement('div');
             statusDiv.className = `status-indicator ${activeTab.isValid ? 'status-valid' : 'status-invalid'}`;
-            statusDiv.textContent = `${activeTab.isValid ? 'Valid' : 'Invalid'} JSON (${totalLines.toLocaleString()} lines)`;
+            statusDiv.textContent = `${activeTab.isValid ? 'Valid' : 'Invalid'} JSON (${lastNonEmptyLine.toLocaleString()} lines)`;
             viewer.appendChild(statusDiv);
             
             contentDiv.appendChild(viewer);

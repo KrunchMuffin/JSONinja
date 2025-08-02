@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.3.0] - 2025-07-26
+### Fixed
+- 🔢 **Line Number Synchronization** - Fixed critical issue where line numbers would get out of sync with content
+  - Removed word wrap feature that was causing line numbers to misalign with wrapped content
+  - Line numbers now always stay perfectly aligned with their corresponding JSON lines
+- 📜 **Virtual Scrolling White Space** - Fixed excessive white space appearing after content in large files
+  - Virtual scrolling now correctly calculates viewport height based on actual content
+  - Line numbers container no longer extends scrollable area beyond content
+  - Files with 400k+ lines now scroll smoothly without phantom white space
+- ⚡ **Performance Improvements** - Significant speed improvements when loading files
+  - Removed word wrap processing overhead for faster initial rendering
+  - Optimized virtual scrolling calculations for better performance
+
+### Removed
+- 📝 **Word Wrap Feature** - Removed word wrap option to ensure line number accuracy
+  - Word wrap was causing line numbers to get out of sync with content
+  - All files now display with horizontal scrolling for long lines
+
 
 ## [1.3.0] - 2025-07-26
 
