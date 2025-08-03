@@ -290,7 +290,7 @@ function buildMenuTemplate() {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About JSONinja',
-              message: 'JSONinja - Advanced JSON Viewer v1.0.0',
+              message: `JSONinja - Advanced JSON Viewer v${app.getVersion()}`,
               detail: 'A powerful, customizable JSON viewer with multi-tab support.\nBuilt with Electron.'
             });
           }
@@ -330,6 +330,10 @@ function createWindow() {
 }
 
 // IPC handlers
+ipcMain.handle('get-version', async () => {
+  return app.getVersion();
+});
+
 ipcMain.handle('save-settings', async (event, settings) => {
   try {
     const settingsPath = path.join(app.getPath('userData'), 'settings.json');

@@ -46,6 +46,21 @@ class JSONViewer {
         this.bindEvents();
         this.bindElectronEvents();
         this.updateUI();
+        await this.loadAppVersion();
+    }
+
+    async loadAppVersion() {
+        if (window.electronAPI && window.electronAPI.getVersion) {
+            try {
+                const version = await window.electronAPI.getVersion();
+                const versionElement = document.getElementById('appVersion');
+                if (versionElement) {
+                    versionElement.textContent = version;
+                }
+            } catch (error) {
+                console.error('Failed to load app version:', error);
+            }
+        }
     }
 
     bindEvents() {
@@ -88,8 +103,31 @@ class JSONViewer {
             this.applyFontSettings();
         });
 
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', () => this.performSearch());
+        // Search functionality with debouncing
+        let searchTimeout;
+        const searchInput = document.getElementById('searchInput');
+        
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => this.performSearch(), 300);
+        });
+        
+        // Add Enter key support for search navigation
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent form submission if in a form
+                
+                if (this.searchResults && this.searchResults.length > 0) {
+                    if (e.shiftKey) {
+                        // Shift+Enter goes to previous result
+                        this.previousSearchResult();
+                    } else {
+                        // Enter goes to next result
+                        this.nextSearchResult();
+                    }
+                }
+            }
+        });
         document.getElementById('searchPrev').addEventListener('click', () => this.previousSearchResult());
         document.getElementById('searchNext').addEventListener('click', () => this.nextSearchResult());
         document.getElementById('closeSearch').addEventListener('click', () => this.hideSearch());
@@ -172,8 +210,9 @@ class JSONViewer {
         // Show Whitespace (sidebar)
         document.getElementById('showWhitespace').addEventListener('change', (e) => {
             this.settings.behavior.showWhitespace = e.target.checked;
-            // Just toggle the body class - no re-render needed!
+            // Toggle the body class AND re-render to add/remove whitespace spans
             document.body.classList.toggle('show-whitespace', e.target.checked);
+            this.updateActiveTabViewPreservingState(); // Re-render to show/hide whitespace
             this.updateSettingsUI(); // Sync with settings panel
         });
 
@@ -999,25 +1038,85 @@ class JSONViewer {
     highlightJsonLine(line, lineNumber) {
         let highlighted = this.escapeHtml(line);
         
+        // Track what we've already processed to avoid double-processing
+        const processedRanges = [];
         
-        // First apply syntax highlighting
-        // Process all quoted strings in one pass, determining if they're keys or values
-        highlighted = highlighted.replace(/&quot;([^&]+)&quot;(\s*:)?/g, (match, content, colon) => {
-            if (colon) {
-                // This is a key
-                return `<span class="json-key">&quot;${content}&quot;</span>${colon}`;
-            } else {
-                // This is a value
-                return `<span class="json-string">&quot;${content}&quot;</span>`;
+        // First, find all quoted strings and their positions
+        const strings = [];
+        let stringMatch;
+        const findStringsRegex = /&quot;((?:[^&]|&(?!quot;))*)&quot;/g;
+        
+        while ((stringMatch = findStringsRegex.exec(highlighted)) !== null) {
+            strings.push({
+                start: stringMatch.index,
+                end: stringMatch.index + stringMatch[0].length,
+                content: stringMatch[1],
+                fullMatch: stringMatch[0],
+                // Check if this is a key (followed by colon)
+                isKey: highlighted.substring(stringMatch.index + stringMatch[0].length).match(/^\s*:/) !== null
+            });
+        }
+        
+        // Build the highlighted string by processing each part
+        let result = '';
+        let lastPos = 0;
+        
+        for (const str of strings) {
+            // Add non-string content before this string
+            if (str.start > lastPos) {
+                let nonStringPart = highlighted.substring(lastPos, str.start);
+                // Apply syntax highlighting to non-string parts
+                nonStringPart = nonStringPart.replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+                nonStringPart = nonStringPart.replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>');
+                nonStringPart = nonStringPart.replace(/\bnull\b/g, '<span class="json-null">null</span>');
+                result += nonStringPart;
             }
-        });
+            
+            // Add the string itself with appropriate highlighting
+            if (str.isKey) {
+                result += `<span class="json-key">&quot;${str.content}&quot;</span>`;
+            } else {
+                result += `<span class="json-string">&quot;${str.content}&quot;</span>`;
+            }
+            
+            lastPos = str.end;
+        }
         
-        // Highlight numbers
-        highlighted = highlighted.replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+        // Add any remaining content
+        if (lastPos < highlighted.length) {
+            let remaining = highlighted.substring(lastPos);
+            remaining = remaining.replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+            remaining = remaining.replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>');
+            remaining = remaining.replace(/\bnull\b/g, '<span class="json-null">null</span>');
+            result += remaining;
+        }
         
-        // Highlight booleans and null
-        highlighted = highlighted.replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>');
-        highlighted = highlighted.replace(/\bnull\b/g, '<span class="json-null">null</span>');
+        highlighted = result;
+        
+        // Apply whitespace visualization to the entire line if enabled
+        // This needs to be done after syntax highlighting but before search highlighting
+        if (this.settings.behavior.showWhitespace) {
+            // Simple approach: Just add whitespace to leading spaces (indentation)
+            // This is the most common use case for JSON
+            const leadingSpaces = highlighted.match(/^(\s*)/);
+            if (leadingSpaces && leadingSpaces[1]) {
+                const spaces = leadingSpaces[1];
+                const visualized = spaces
+                    .replace(/ /g, '<span class="whitespace-dot"></span>')
+                    .replace(/\t/g, '<span class="whitespace-tab"></span>');
+                highlighted = visualized + highlighted.substring(spaces.length);
+            }
+            
+            // Also handle spaces between elements (after commas, colons, etc)
+            // but not inside strings
+            highlighted = highlighted.replace(/([:,\[\]{}])\s+/g, (match, punctuation) => {
+                const spaces = match.substring(1);
+                const visualized = spaces
+                    .replace(/ /g, '<span class="whitespace-dot"></span>')
+                    .replace(/\t/g, '<span class="whitespace-tab"></span>');
+                return punctuation + visualized;
+            });
+        }
         
         // Highlight brackets
         if (this.settings.behavior.rainbowBrackets && this.bracketLevels && this.bracketLevels[lineNumber]) {
@@ -1062,8 +1161,13 @@ class JSONViewer {
                 if (this.currentSearchType === 'key') {
                     // Only highlight within json-key spans
                     highlighted = highlighted.replace(/<span class="json-key">([^<]+)<\/span>/g, (match, keyContent) => {
-                        const highlightedKey = keyContent.replace(searchRegex, '<span class="search-highlight">$1</span>');
-                        return `<span class="json-key">${highlightedKey}</span>`;
+                        // Remove quotes before searching
+                        const innerContent = keyContent.replace(/^&quot;|&quot;$/g, '');
+                        if (innerContent.toLowerCase().includes(this.currentSearchQuery.toLowerCase())) {
+                            const highlightedInner = innerContent.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                            return `<span class="json-key">&quot;${highlightedInner}&quot;</span>`;
+                        }
+                        return match;
                     });
                 } else if (this.currentSearchType === 'value') {
                     // Highlight in all spans except json-key
@@ -1076,8 +1180,25 @@ class JSONViewer {
                     
                     patterns.forEach(pattern => {
                         highlighted = highlighted.replace(pattern.regex, (match, content) => {
-                            const highlightedContent = content.replace(searchRegex, '<span class="search-highlight">$1</span>');
-                            return `<span class="${pattern.class}">${highlightedContent}</span>`;
+                            // Remove quotes from content for string values before searching
+                            let searchContent = content;
+                            if (pattern.class === 'json-string') {
+                                searchContent = content.replace(/^&quot;|&quot;$/g, '');
+                            }
+                            
+                            // Check if this content contains our search term
+                            if (searchContent.toLowerCase().includes(this.currentSearchQuery.toLowerCase())) {
+                                // For strings, we need to highlight within the quotes
+                                if (pattern.class === 'json-string') {
+                                    const innerContent = content.replace(/^&quot;|&quot;$/g, '');
+                                    const highlightedInner = innerContent.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                                    return `<span class="${pattern.class}">&quot;${highlightedInner}&quot;</span>`;
+                                } else {
+                                    const highlightedContent = content.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                                    return `<span class="${pattern.class}">${highlightedContent}</span>`;
+                                }
+                            }
+                            return match; // Return unchanged if no search match
                         });
                     });
                 } else {
@@ -1092,8 +1213,25 @@ class JSONViewer {
                     
                     allPatterns.forEach(pattern => {
                         highlighted = highlighted.replace(pattern.regex, (match, content) => {
-                            const highlightedContent = content.replace(searchRegex, '<span class="search-highlight">$1</span>');
-                            return `<span class="${pattern.class}">${highlightedContent}</span>`;
+                            // Remove quotes from content for string values before searching
+                            let searchContent = content;
+                            if (pattern.class === 'json-string' || pattern.class === 'json-key') {
+                                searchContent = content.replace(/^&quot;|&quot;$/g, '');
+                            }
+                            
+                            // Check if this content contains our search term
+                            if (searchContent.toLowerCase().includes(this.currentSearchQuery.toLowerCase())) {
+                                // For strings and keys, we need to highlight within the quotes
+                                if (pattern.class === 'json-string' || pattern.class === 'json-key') {
+                                    const innerContent = content.replace(/^&quot;|&quot;$/g, '');
+                                    const highlightedInner = innerContent.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                                    return `<span class="${pattern.class}">&quot;${highlightedInner}&quot;</span>`;
+                                } else {
+                                    const highlightedContent = content.replace(searchRegex, '<span class="search-highlight">$1</span>');
+                                    return `<span class="${pattern.class}">${highlightedContent}</span>`;
+                                }
+                            }
+                            return match; // Return unchanged if no search match
                         });
                     });
                 }
@@ -1170,10 +1308,8 @@ class JSONViewer {
         // textContent/innerHTML doesn't escape quotes, so we need to do it manually
         let escaped = div.innerHTML.replace(/"/g, '&quot;');
         
-        // Always add whitespace spans, CSS controls visibility
-        escaped = escaped
-            .replace(/ /g, '<span class="whitespace-dot"></span>')  // Replace spaces with spans
-            .replace(/\t/g, '<span class="whitespace-tab"></span>'); // Replace tabs with spans
+        // Don't add whitespace spans here - we'll do it selectively later
+        // to avoid breaking string content
         
         return escaped;
     }
@@ -1464,14 +1600,28 @@ class JSONViewer {
         
         this.searchResults = this.findMatchesInLines(activeTab.jsonData, query, searchType);
         this.updateSearchResults(this.searchResults.length, this.searchResults.length > 0 ? 1 : 0);
-
-        if (this.searchResults.length > 0) {
-            this.currentSearchIndex = 0;
-            this.scrollToSearchResult(0);
-        }
         
         // Re-render to apply search highlighting
         this.updateActiveTabView();
+        
+        // Restore focus to search input after re-render
+        setTimeout(() => {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && document.activeElement !== searchInput) {
+                searchInput.focus();
+                // Restore cursor position
+                const cursorPos = query.length;
+                searchInput.setSelectionRange(cursorPos, cursorPos);
+            }
+        }, 0);
+
+        if (this.searchResults.length > 0) {
+            this.currentSearchIndex = 0;
+            // Use setTimeout to ensure render completes before scrolling
+            setTimeout(() => {
+                this.scrollToSearchResult(0);
+            }, 50);
+        }
     }
 
     findMatchesInLines(data, query, searchType) {
@@ -1516,15 +1666,26 @@ class JSONViewer {
                 }
                 
                 // Look for non-string values (numbers, booleans, null)
-                const nonStringMatch = line.match(/:\s*([^,\s\]\}]+)/);
-                if (nonStringMatch && nonStringMatch[1].toLowerCase().includes(searchQuery)) {
-                    matches.push({
-                        lineNumber: lineNumber,
-                        type: 'value',
-                        value: nonStringMatch[1],
-                        column: line.indexOf(nonStringMatch[1])
-                    });
-                }
+                // More specific patterns to avoid duplicates
+                const patterns = [
+                    /:\s*(true|false|null)(?=[,\s\]\}])/gi,  // booleans and null
+                    /:\s*(-?\d+\.?\d*)(?=[,\s\]\}])/g        // numbers
+                ];
+                
+                patterns.forEach(pattern => {
+                    let match;
+                    while ((match = pattern.exec(line)) !== null) {
+                        const value = match[1];
+                        if (value.toLowerCase().includes(searchQuery)) {
+                            matches.push({
+                                lineNumber: lineNumber,
+                                type: 'value',
+                                value: value,
+                                column: match.index + match[0].indexOf(value)
+                            });
+                        }
+                    }
+                });
             }
         });
         
@@ -1641,6 +1802,7 @@ class JSONViewer {
     nextSearchResult() {
         if (this.searchResults.length === 0) return;
         this.currentSearchIndex = (this.currentSearchIndex + 1) % this.searchResults.length;
+        console.log(`Navigating to result ${this.currentSearchIndex + 1}/${this.searchResults.length}, line ${this.searchResults[this.currentSearchIndex].lineNumber}`);
         this.scrollToSearchResult(this.currentSearchIndex);
         this.updateSearchResults(this.searchResults.length, this.currentSearchIndex + 1);
     }
@@ -1652,45 +1814,105 @@ class JSONViewer {
         const lineNumber = result.lineNumber;
         
         // Expand any collapsed regions that contain this result
-        this.expandToShowLine(lineNumber);
+        const wasExpanded = this.expandToShowLine(lineNumber);
         
-        // Mark current search result
-        this.currentSearchIndex = index;
+        // If we expanded a region, we need to update the DOM
+        if (wasExpanded) {
+            // Update collapsed regions in DOM without full re-render
+            Object.keys(this.collapsibleRegions).forEach(startLine => {
+                const region = this.collapsibleRegions[startLine];
+                this.updateCollapsedRegion(parseInt(startLine), region);
+            });
+        }
         
-        // Re-render to update highlighting
-        this.updateActiveTabView();
-        
-        // Scroll to the line after render
+        // Use setTimeout to ensure DOM updates are complete
         setTimeout(() => {
-            const lineElement = document.querySelector(`.json-line[data-line="${lineNumber}"]`);
-            if (lineElement) {
-                lineElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Check if we're in virtual scroll mode
+            const viewer = document.querySelector('.json-viewer.virtual-scroll');
+            if (viewer) {
+                // For virtual scrolling, calculate the scroll position
+                const computedStyle = getComputedStyle(document.documentElement);
+                const fontSize = parseFloat(computedStyle.getPropertyValue('--font-size')) || 14;
+                const lineHeightRatio = parseFloat(computedStyle.getPropertyValue('--line-height')) || 1.4;
+                const LINE_HEIGHT = Math.ceil(fontSize * lineHeightRatio);
                 
-                // Find and highlight the current match within the line
-                const highlights = lineElement.querySelectorAll('.search-highlight');
-                if (highlights.length > 0) {
-                    // Remove previous current highlight
-                    document.querySelectorAll('.search-highlight.current').forEach(el => {
-                        el.classList.remove('current');
-                    });
-                    
-                    // Add current highlight to the first match in this line
-                    highlights[0].classList.add('current');
+                // Calculate target scroll position (center the line in viewport)
+                const targetScrollTop = (lineNumber - 1) * LINE_HEIGHT - (viewer.clientHeight / 2) + (LINE_HEIGHT / 2);
+                viewer.scrollTop = Math.max(0, targetScrollTop);
+                
+                // Wait for virtual scroll to render the line
+                setTimeout(() => {
+                    const lineElement = document.querySelector(`.json-line[data-line="${lineNumber}"]`);
+                    if (!lineElement) {
+                        console.error(`Could not find line element for line ${lineNumber} after virtual scroll`);
+                        return;
+                    }
+                    this.highlightCurrentSearchResult(lineElement, index);
+                }, 100);
+            } else {
+                // Normal scrolling for non-virtual scroll
+                const lineElement = document.querySelector(`.json-line[data-line="${lineNumber}"]`);
+                if (!lineElement) {
+                    console.error(`Could not find line element for line ${lineNumber}`);
+                    return;
+                }
+                
+                // Scroll to the line
+                lineElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                this.highlightCurrentSearchResult(lineElement, index);
+            }
+        }, 50);
+    }
+    
+    highlightCurrentSearchResult(lineElement, index) {
+        // Remove all current highlights
+        document.querySelectorAll('.search-highlight.current').forEach(el => {
+            el.classList.remove('current');
+        });
+        
+        // Find and highlight the current match within the line
+        const highlights = lineElement.querySelectorAll('.search-highlight');
+        const currentResult = this.searchResults[index];
+        const lineNumber = parseInt(lineElement.getAttribute('data-line'));
+        
+        if (highlights.length > 0) {
+            // Get all results on this line
+            const lineResults = this.searchResults.filter(r => r.lineNumber === lineNumber);
+            
+            // Find which result on this line corresponds to our current global index
+            let targetResultOnLine = null;
+            for (let i = 0; i < lineResults.length; i++) {
+                if (this.searchResults.indexOf(lineResults[i]) === index) {
+                    targetResultOnLine = i;
+                    break;
                 }
             }
-        }, 0);
+            
+            console.log(`Line ${lineNumber}: ${highlights.length} highlights, ${lineResults.length} results, targeting result #${targetResultOnLine}`);
+            
+            // Apply the current class to the appropriate highlight
+            if (targetResultOnLine !== null && highlights[targetResultOnLine]) {
+                highlights[targetResultOnLine].classList.add('current');
+            } else {
+                // Fallback to first highlight
+                highlights[0].classList.add('current');
+            }
+        }
     }
     
     expandToShowLine(targetLine) {
         // Expand any collapsed regions that contain this line
+        let expanded = false;
         Object.keys(this.collapsibleRegions).forEach(startLine => {
             const region = this.collapsibleRegions[startLine];
             if (region.collapsed && 
                 targetLine > parseInt(startLine) && 
                 targetLine <= region.endLine) {
                 region.collapsed = false;
+                expanded = true;
             }
         });
+        return expanded;
     }
 
 

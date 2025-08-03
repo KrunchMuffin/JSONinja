@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🔍 **Enter Key Navigation for Search** - Press Enter to go to next search result, Shift+Enter for previous
+- 📋 **Dynamic Version Display** - About dialog and settings now show version from package.json instead of hardcoded value
+
+### Fixed
+- 🔄 **Search Navigation** - Fixed issue where clicking next/previous buttons would scroll to top instead of navigating to search results
+- 🔍 **Search Highlighting for Partial Matches** - Fixed highlighting not working for partial matches within values (e.g., searching "sarah" in "383555SMITH,SARAH")
+- 📜 **Virtual Scrolling Search Navigation** - Fixed "line element not found" error when searching in very large JSON files (>50,000 lines)
+- 👁️ **Show Whitespace Toggle** - Fixed whitespace visualization not appearing when toggled (now properly triggers re-render)
+
+### Improved
+- 🎨 **Modern Select Box Styling** - Updated select dropdowns in settings with custom styling, proper dark mode support, and smooth transitions
+- 🌙 **Select Dropdown Dark Mode** - Fixed dropdown options showing with poor contrast (white background with light gray text) in dark mode
+
 ## [1.3.1] - 2025-08-02
 
 ### Fixed

@@ -802,6 +802,102 @@ body.show-whitespace .whitespace-tab::before {
   max-width: 200px;
 }
 
+/* Modern select box styling */
+.setting-item select {
+  appearance: none;
+  background-color: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 36px 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg width='14' height='8' viewBox='0 0 14 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M1 1L7 7L13 1' stroke='%23808080' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+}
+
+.setting-item select:hover {
+  border-color: var(--accent-color);
+  background-color: var(--input-hover-bg, rgba(255, 255, 255, 0.08));
+}
+
+.setting-item select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(150, 180, 255, 0.15);
+}
+
+/* Firefox specific styling */
+@-moz-document url-prefix() {
+  .setting-item select {
+    text-indent: 0.01px;
+  }
+}
+
+/* Theme-specific select colors */
+[data-theme="dark"] .setting-item select,
+[data-theme="monokai"] .setting-item select {
+  color-scheme: dark;
+}
+
+[data-theme="light"] .setting-item select,
+[data-theme="github"] .setting-item select {
+  color-scheme: light;
+  background-color: rgba(0, 0, 0, 0.03);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg width='14' height='8' viewBox='0 0 14 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M1 1L7 7L13 1' stroke='%23666666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+}
+
+[data-theme="light"] .setting-item select:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Style select dropdown options */
+.setting-item select option {
+  background-color: var(--bg-primary);
+  color: var(--text-color);
+  padding: 8px;
+}
+
+/* Dark mode specific option styling */
+[data-theme="dark"] .setting-item select option {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .setting-item select option:hover,
+[data-theme="dark"] .setting-item select option:checked {
+  background-color: #2d2d30;
+  color: #ffffff;
+}
+
+/* Light mode specific option styling */
+[data-theme="light"] .setting-item select option {
+  background-color: #ffffff;
+  color: #333333;
+}
+
+[data-theme="light"] .setting-item select option:hover,
+[data-theme="light"] .setting-item select option:checked {
+  background-color: #f0f0f0;
+  color: #000000;
+}
+
+/* Monokai theme option styling */
+[data-theme="monokai"] .setting-item select option {
+  background-color: #272822;
+  color: #f8f8f2;
+}
+
+/* GitHub theme option styling */
+[data-theme="github"] .setting-item select option {
+  background-color: #ffffff;
+  color: #24292e;
+}
+
 .setting-item input[type="color"] {
   width: 50px;
   height: 30px;
