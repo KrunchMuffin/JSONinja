@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-08-03
+
 ### Added
 - 🔍 **Enter Key Navigation for Search** - Press Enter to go to next search result, Shift+Enter for previous
 - 📋 **Dynamic Version Display** - About dialog and settings now show version from package.json instead of hardcoded value
