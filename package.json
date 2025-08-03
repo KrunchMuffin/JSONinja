@@ -100,28 +100,17 @@
       }
     ],
     "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
+      "target": {
+        "target": "dmg",
+        "arch": [
+          "universal"
+        ]
+      },
       "category": "public.app-category.developer-tools",
-      "artifactName": "${productName}-v${version}-${arch}.${ext}"
+      "artifactName": "${productName}-v${version}.${ext}"
     },
     "dmg": {
       "title": "${productName} v${version}",
-      "artifactName": "${productName}-v${version}.${ext}",
       "contents": [
         {
           "x": 410,
