@@ -178,8 +178,6 @@ JSONinja/
 ├── styles.css            # All application styles including themes
 ├── renderer.js           # Application logic & state management
 ├── CHANGELOG.md          # Version history and features
-├── TODO.md               # Planned features and improvements
-├── CLAUDE.md             # Development context and patterns
 └── README.md            # This file
 ```
 
