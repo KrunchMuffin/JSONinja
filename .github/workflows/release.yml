@@ -92,6 +92,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Update README with new version
+        run: |
+          VERSION="${{ steps.extract_info.outputs.VERSION }}"
+          VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix for numbers
+
+          # Update the header
+          sed -i "s/### Latest Release (v[0-9]\+\.[0-9]\+\.[0-9]\+)/### Latest Release (${VERSION})/g" README.md
+
+          # Update download links - use exact patterns from your README
+          sed -i "s/JSONinja-Setup-v[0-9]\+\.[0-9]\+\.[0-9]\+-x64\.exe/JSONinja-Setup-v${VERSION_NUM}-x64.exe/g" README.md
+          sed -i "s/JSONinja-Portable-v[0-9]\+\.[0-9]\+\.[0-9]\+-x64\.exe/JSONinja-Portable-v${VERSION_NUM}-x64.exe/g" README.md
+          sed -i "s/JSONinja-v[0-9]\+\.[0-9]\+\.[0-9]\+\.dmg/JSONinja-v${VERSION_NUM}.dmg/g" README.md
+          sed -i "s/JSONinja-v[0-9]\+\.[0-9]\+\.[0-9]\+-x64\.AppImage/JSONinja-v${VERSION_NUM}-x64.AppImage/g" README.md
+
+      - name: Commit README updates
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add README.md
+          git commit -m "Update README for release ${{ steps.extract_info.outputs.VERSION }}" || exit 0
+          git push
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:

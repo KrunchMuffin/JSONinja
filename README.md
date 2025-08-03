@@ -47,12 +47,12 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 ## 📦 Downloads
 
-### Latest Release (v1.3.0)
+### Latest Release (v1.3.2)
 
-- **Windows Installer**: [JSONinja-Setup.exe](../../releases/latest/download/JSONinja-Setup-v1.3.0-x64.exe)
-- **Windows Portable**: [JSONinja-Portable.exe](../../releases/latest/download/JSONinja-Portable-v1.3.0-x64.exe)
-- **macOS**: [JSONinja.dmg](../../releases/latest/download/JSONinja-v1.3.0.dmg)
-- **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-v1.3.0-x86_64.AppImage)
+- **Windows Installer**: [JSONinja-Setup.exe](../../releases/latest/download/JSONinja-Setup-v1.3.2-x64.exe)
+- **Windows Portable**: [JSONinja-Portable.exe](../../releases/latest/download/JSONinja-Portable-v1.3.2-x64.exe)
+- **macOS**: [JSONinja.dmg](../../releases/latest/download/JSONinja-v1.3.2.dmg)
+- **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-v1.3.2-x64.AppImage)
 - **Others**: [View All Releases](../../releases)
 
 ### Quick Install
