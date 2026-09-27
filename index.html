@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:">
     <title>JSONinja - Advanced JSON Viewer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -92,9 +93,9 @@
                     <h2>JSONinja - Advanced JSON Viewer</h2>
                     <p>Load a JSON file or paste JSON content to get started.</p>
                     <div class="welcome-actions">
-                        <button class="btn-primary" onclick="document.getElementById('loadFileBtn').click()">Load JSON
+                        <button class="btn-primary" id="welcomeLoadBtn">Load JSON
                             File</button>
-                        <button class="btn-secondary" onclick="document.getElementById('pasteJsonBtn').click()">Paste
+                        <button class="btn-secondary" id="welcomePasteBtn">Paste
                             JSON</button>
                     </div>
                 </div>

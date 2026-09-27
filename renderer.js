@@ -70,6 +70,16 @@ class JSONViewer {
         // File operations
         document.getElementById('loadFileBtn').addEventListener('click', () => this.showFileDialog());
         document.getElementById('pasteJsonBtn').addEventListener('click', () => this.showPasteModal());
+        document.getElementById('welcomeLoadBtn').addEventListener('click', () => this.showFileDialog());
+        document.getElementById('welcomePasteBtn').addEventListener('click', () => this.showPasteModal());
+
+        // Gutter toggles are re-rendered constantly, so delegate instead of binding each one
+        document.addEventListener('click', (e) => {
+            const toggle = e.target.closest('.gutter-toggle');
+            if (toggle) {
+                this.toggleRegion(parseInt(toggle.dataset.line, 10));
+            }
+        });
         document.getElementById('validateBtn').addEventListener('click', () => this.validateCurrentTab());
         document.getElementById('formatBtn').addEventListener('click', () => this.formatCurrentTab());
         document.getElementById('minifyBtn').addEventListener('click', () => this.minifyCurrentTab());
@@ -376,10 +386,18 @@ class JSONViewer {
         this.tabs.forEach(tab => {
             const tabElement = document.createElement('div');
             tabElement.className = `tab ${tab.id === this.activeTabId ? 'active' : ''}`;
-            tabElement.innerHTML = `
-                <span class="tab-title" title="${tab.title}">${tab.title}</span>
-                <button class="tab-close" onclick="app.closeTab('${tab.id}')">&times;</button>
-            `;
+            // Titles come from file names, so never build them as HTML
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'tab-title';
+            titleSpan.title = tab.title;
+            titleSpan.textContent = tab.title;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'tab-close';
+            closeBtn.textContent = '×';
+            closeBtn.addEventListener('click', () => this.closeTab(tab.id));
+
+            tabElement.append(titleSpan, closeBtn);
             tabElement.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('tab-close')) {
                     this.switchToTab(tab.id);
@@ -526,7 +544,7 @@ class JSONViewer {
                         lineNumDiv.className = 'line-number-with-toggle';
                         lineNumDiv.setAttribute('data-line', lineNumber);
                         lineNumDiv.innerHTML = `
-                            <button class="gutter-toggle" data-line="${lineNumber}" onclick="app.toggleRegion(${lineNumber})">▼</button>
+                            <button class="gutter-toggle" data-line="${lineNumber}">▼</button>
                             <span class="line-num">${lineNumber}</span>
                         `;
                         lineNumberFragment.appendChild(lineNumDiv);
@@ -719,7 +737,7 @@ class JSONViewer {
                             lineNumDiv.setAttribute('data-line', lineNumber);
                             lineNumDiv.style.height = `${LINE_HEIGHT}px`;
                             lineNumDiv.innerHTML = `
-                                <button class="gutter-toggle" data-line="${lineNumber}" onclick="app.toggleRegion(${lineNumber})">▼</button>
+                                <button class="gutter-toggle" data-line="${lineNumber}">▼</button>
                                 <span class="line-num">${lineNumber}</span>
                             `;
                             lineNumberFragment.appendChild(lineNumDiv);
@@ -1290,7 +1308,7 @@ class JSONViewer {
                 const collapsedClass = region.collapsed ? ' collapsed-region' : '';
                 const numberDisplay = hideNumbers ? '' : `<span class="line-num">${lineNumber}</span>`;
                 return `<div class="line-number-with-toggle${hiddenClass}${collapsedClass}" data-line="${lineNumber}">
-                    <button class="gutter-toggle" data-line="${lineNumber}" onclick="app.toggleRegion(${lineNumber})">${toggleIcon}</button>
+                    <button class="gutter-toggle" data-line="${lineNumber}">${toggleIcon}</button>
                     ${numberDisplay}
                 </div>`;
             } else {
@@ -1725,57 +1743,6 @@ class JSONViewer {
 
         traverse(data, '');
         return matches;
-    }
-
-    highlightSearchResults() {
-        // This is a simplified version - in a real implementation,
-        // you'd need to traverse the DOM and highlight matching text
-        this.clearSearchHighlights();
-
-        if (!this.settings.behavior.highlightMatches) return;
-
-        const jsonContent = document.querySelector('.json-content');
-        if (!jsonContent) return;
-
-        // Simple text-based highlighting (could be improved)
-        const query = document.getElementById('searchInput').value.trim();
-        if (query) {
-            this.highlightText(jsonContent, query);
-        }
-    }
-
-    highlightText(element, query) {
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-
-        const walker = document.createTreeWalker(
-            element,
-            NodeFilter.SHOW_TEXT,
-            null,
-            false
-        );
-
-        const textNodes = [];
-        let node;
-        while (node = walker.nextNode()) {
-            textNodes.push(node);
-        }
-
-        textNodes.forEach(textNode => {
-            const parent = textNode.parentNode;
-            if (parent.classList.contains('search-highlight')) return;
-
-            const text = textNode.textContent;
-            if (regex.test(text)) {
-                const highlightedText = text.replace(regex, '<span class="search-highlight">$1</span>');
-                const wrapper = document.createElement('div');
-                wrapper.innerHTML = highlightedText;
-
-                while (wrapper.firstChild) {
-                    parent.insertBefore(wrapper.firstChild, textNode);
-                }
-                parent.removeChild(textNode);
-            }
-        });
     }
 
     clearSearchHighlights() {

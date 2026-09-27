@@ -7,6 +7,11 @@ const { exec } = require('child_process');
 let mainWindow;
 let fileToOpen = null; // Store file path from command line
 
+// Paths the user has actually opened. The renderer can only ask to re-read
+// these, so injected script can't use the encoding reload to read any file.
+const openedFiles = new Set();
+const RELOAD_ENCODINGS = new Set(['utf-8', 'latin1', 'cp1252', 'windows-1252', 'win1252']);
+
 // Recent files management
 function getRecentFiles() {
   try {
@@ -50,7 +55,9 @@ function detectAndReadFile(filePath) {
   let content;
   let encoding = 'utf-8';
   let hasEncodingIssues = false;
-  
+
+  openedFiles.add(filePath);
+
   try {
     // Try UTF-8 first
     content = fs.readFileSync(filePath, 'utf-8');
@@ -358,6 +365,10 @@ ipcMain.handle('load-settings', async () => {
 });
 
 ipcMain.handle('reload-with-encoding', async (event, { filePath, encoding }) => {
+  if (!openedFiles.has(filePath) || !RELOAD_ENCODINGS.has(encoding)) {
+    return { success: false, error: 'Reload not allowed for this file or encoding' };
+  }
+
   try {
     let content;
     
