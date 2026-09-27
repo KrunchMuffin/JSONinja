@@ -35,14 +35,21 @@ jobs:
           ' CHANGELOG.md > release_notes.md
           [ -s release_notes.md ] || echo "Release ${TAG}" > release_notes.md
 
+      # Reuses the release if one already exists, so a failed build can be re-run
       - name: Create draft release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.info.outputs.tag }}
         run: |
-          gh release create "$TAG" --draft --title "JSONinja $TAG" --notes-file release_notes.md --target "$GITHUB_SHA"
-          ID=$(gh api "repos/${{ github.repository }}/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id")
+          find_release() {
+            gh api "repos/${{ github.repository }}/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id"
+          }
+          ID=$(find_release)
+          if [ -z "$ID" ]; then
+            gh release create "$TAG" --draft --title "JSONinja $TAG" --notes-file release_notes.md --target "$GITHUB_SHA"
+            ID=$(find_release)
+          fi
           echo "id=${ID}" >> "$GITHUB_OUTPUT"
 
   build:
