@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - Unreleased
+
+### Changed
+- 🪶 **Rebuilt on Tauri** - JSONinja now uses the system's built-in web engine instead of bundling Chromium. The Windows installer drops from 84 MB to about 1.3 MB, and the portable exe is about 3.6 MB
+- ⚙️ **Settings and recent files carry over** - Uses the same data folder as 1.x, so nothing needs to be set up again
+- 🪟 **Windows file registration** - "Register as JSON Handler" now writes the registry directly instead of running a batch file in a console window
+
+### Added
+- 📂 **Drag & Drop** - Drop JSON files onto the window to open them
+- 🔍 **Zoom shortcuts** - Ctrl/Cmd + `=`, `-` and `0` zoom the view on every platform
+
+### Security
+- 🔒 **Escaped tab titles** - File names are no longer inserted into the page as HTML
+- 🛡️ **Content Security Policy** - Only the app's own scripts can run
+- 🚧 **Locked-down file access** - The viewer can only re-read files you opened, and the page has no general file-system access
+
 ## [1.3.2] - 2025-08-03
 
 ### Added

@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:">
     <title>JSONinja - Advanced JSON Viewer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -232,7 +231,7 @@
                             <p class="app-info">
                                 <strong>JSONinja - Advanced JSON Viewer</strong><br>
                                 Version <span id="appVersion">Loading...</span><br>
-                                Built with Electron
+                                Built with Tauri
                             </p>
                             <p class="attribution">
                                 Icons provided by <a href="http://www.icons-land.com" target="_blank"
@@ -267,6 +266,7 @@
         </div>
     </div>
 
+    <script src="native-bridge.js"></script>
     <script src="renderer.js"></script>
 </body>
 

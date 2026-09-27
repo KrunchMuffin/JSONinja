@@ -44,15 +44,15 @@ class JSONViewer {
         await this.loadSettings();
         this.applySettings();
         this.bindEvents();
-        this.bindElectronEvents();
+        this.bindNativeEvents();
         this.updateUI();
         await this.loadAppVersion();
     }
 
     async loadAppVersion() {
-        if (window.electronAPI && window.electronAPI.getVersion) {
+        if (window.nativeAPI && window.nativeAPI.getVersion) {
             try {
-                const version = await window.electronAPI.getVersion();
+                const version = await window.nativeAPI.getVersion();
                 const versionElement = document.getElementById('appVersion');
                 if (versionElement) {
                     versionElement.textContent = version;
@@ -251,9 +251,9 @@ class JSONViewer {
         });
     }
 
-    bindElectronEvents() {
-        if (window.electronAPI) {
-            window.electronAPI.onFileOpened((event, data) => {
+    bindNativeEvents() {
+        if (window.nativeAPI) {
+            window.nativeAPI.onFileOpened((event, data) => {
                 
                 // Create new tab and get its ID
                 const newTabId = this.createNewTab();
@@ -273,12 +273,12 @@ class JSONViewer {
                 
             });
 
-            window.electronAPI.onNewTab(() => this.createNewTab());
-            window.electronAPI.onCloseTab(() => this.closeCurrentTab());
-            window.electronAPI.onToggleSettings(() => this.toggleSettings());
-            window.electronAPI.onToggleSearch(() => this.toggleSearch());
-            window.electronAPI.onExpandAll(() => this.expandAll());
-            window.electronAPI.onCollapseAll(() => this.collapseAll());
+            window.nativeAPI.onNewTab(() => this.createNewTab());
+            window.nativeAPI.onCloseTab(() => this.closeCurrentTab());
+            window.nativeAPI.onToggleSettings(() => this.toggleSettings());
+            window.nativeAPI.onToggleSearch(() => this.toggleSearch());
+            window.nativeAPI.onExpandAll(() => this.expandAll());
+            window.nativeAPI.onCollapseAll(() => this.collapseAll());
         }
     }
 
@@ -292,6 +292,12 @@ class JSONViewer {
 
         if (e.ctrlKey || e.metaKey) {
             switch (e.key) {
+                // Native menu accelerators don't fire while WebView2 has focus,
+                // so Windows relies on the page handling these shortcuts
+                case 'o':
+                    e.preventDefault();
+                    this.showFileDialog();
+                    break;
                 case 't':
                     e.preventDefault();
                     this.createNewTab();
@@ -1375,11 +1381,11 @@ class JSONViewer {
     }
 
     showFileDialog() {
-        if (window.electronAPI && window.electronAPI.showOpenDialog) {
-            // Use Electron's file dialog for proper encoding detection
-            window.electronAPI.showOpenDialog();
+        if (window.nativeAPI && window.nativeAPI.showOpenDialog) {
+            // Use the native file dialog for proper encoding detection
+            window.nativeAPI.showOpenDialog();
         } else {
-            // Fallback for non-Electron environment (like web preview)
+            // Fallback when running as a plain web page (like web preview)
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json,application/json';
@@ -1952,8 +1958,8 @@ class JSONViewer {
     }
 
     async saveSettings() {
-        if (window.electronAPI) {
-            await window.electronAPI.saveSettings(this.settings);
+        if (window.nativeAPI) {
+            await window.nativeAPI.saveSettings(this.settings);
         } else {
             localStorage.setItem('jsonViewerSettings', JSON.stringify(this.settings));
         }
@@ -1964,8 +1970,8 @@ class JSONViewer {
         try {
             let settings = null;
 
-            if (window.electronAPI) {
-                const result = await window.electronAPI.loadSettings();
+            if (window.nativeAPI) {
+                const result = await window.nativeAPI.loadSettings();
                 if (result.success && result.settings) {
                     settings = result.settings;
                 }
@@ -2125,10 +2131,10 @@ class JSONViewer {
     }
 
     async reloadWithEncoding(filePath, encoding) {
-        if (!window.electronAPI) return;
+        if (!window.nativeAPI) return;
         
         try {
-            const result = await window.electronAPI.reloadWithEncoding({ filePath, encoding });
+            const result = await window.nativeAPI.reloadWithEncoding({ filePath, encoding });
             if (result.success) {
                 const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
                 if (activeTab) {

@@ -1,6 +1,6 @@
 # JSONinja - Advanced JSON Viewer
 
-A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON structures with ease using array indices, string length indicators, full-screen mode, and advanced customization options.
+A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10 MB. Navigate large JSON structures with ease using array indices, string length indicators, full-screen mode, and advanced customization options.
 
 ## Features
 
@@ -47,26 +47,29 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 ## 📦 Downloads
 
-### Latest Release (v1.3.2)
+Get the latest version from the **[Releases page](../../releases/latest)**:
 
-- **Windows Installer**: [JSONinja-Setup.exe](../../releases/latest/download/JSONinja-Setup-v1.3.2-x64.exe)
-- **Windows Portable**: [JSONinja-Portable.exe](../../releases/latest/download/JSONinja-Portable-v1.3.2-x64.exe)
-- **macOS**: [JSONinja.dmg](../../releases/latest/download/JSONinja-v1.3.2.dmg)
-- **Linux AppImage**: [JSONinja.AppImage](../../releases/latest/download/JSONinja-v1.3.2-x64.AppImage)
-- **Others**: [View All Releases](../../releases)
+| Platform | File |
+|---|---|
+| Windows installer | `JSONinja_<version>_x64-setup.exe` |
+| Windows portable (no install) | `JSONinja-Portable-v<version>-x64.exe` |
+| macOS (Intel + Apple Silicon) | `JSONinja_<version>_universal.dmg` |
+| Linux | `.AppImage`, `.deb` or `.rpm` |
 
 ### Quick Install
 
 **Windows:**
-1. Download and run the installer setup or portable version
-2. Optional: Follow the setup wizard if running the installer
+1. Run the installer, or just run the portable exe
+2. Windows 11 already has everything needed. On Windows 10, the installer adds the WebView2 runtime if it's missing; the portable exe needs WebView2 to already be installed (it usually is, via Edge)
+
+**macOS:**
+1. Open the DMG and drag JSONinja to Applications
+2. The app isn't notarized yet, so the first time, right-click it and choose **Open**
 
 **Linux:**
 1. Download the AppImage
-2. Make executable: `chmod +x JSONinja.AppImage`
-3. Run: `./JSONinja.AppImage`
-
-> 📋 **Note**: macOS builds coming soon! For now, you can build from source.
+2. Make executable: `chmod +x JSONinja*.AppImage`
+3. Run it: `./JSONinja*.AppImage`
 
 [View All Releases](../../releases) | [Report Issues](../../issues)
 
@@ -74,7 +77,8 @@ A powerful, feature-rich JSON viewer built with Electron. Navigate large JSON st
 
 ### Prerequisites
 - Node.js (v18 or higher)
-- npm or yarn
+- [Rust](https://rustup.rs/) (stable)
+- The [Tauri system prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS (MSVC build tools on Windows, Xcode tools on macOS, WebKitGTK on Linux)
 - Git
 
 ### Step 1: Clone the repository
@@ -90,41 +94,22 @@ npm install
 
 ### Step 3: Run in development mode
 ```bash
-# Start the application
-npm start
-
-# Or with development features
 npm run dev
 ```
 
-### Step 4: Build executable (optional)
-
+### Step 4: Build (optional)
 ```bash
-# Build for current platform only
 npm run build
-
-# Build for specific platforms
-npm run build-win    # Windows (x64 only)
-npm run build-mac    # macOS (Intel + Apple Silicon)
-npm run build-linux  # Linux (x64 only)
-
-# Build for all platforms
-npm run build-all
 ```
 
-Built files will be in the `dist/` folder.
+Installers end up in `src-tauri/target/release/bundle/`, and the standalone exe/binary in `src-tauri/target/release/`.
 
 ### Build Targets
-- **Windows**: NSIS installer + Portable executable (x64 only)
-- **macOS**: DMG installer + ZIP archive (Intel + Apple Silicon)
-- **Linux**: AppImage + DEB + RPM packages (x64 only)
+- **Windows**: NSIS installer + portable exe (x64)
+- **macOS**: DMG (universal: Intel + Apple Silicon)
+- **Linux**: AppImage + DEB + RPM (x64)
 
-### Build Configuration
-The app uses `electron-builder` with these features:
-- **64-bit only** - No 32-bit builds for better performance
-- **Portable options** - No installation required versions available
-- **Multiple formats** - Choose the package format that works for you
-- **Optimized packaging** - Only includes necessary files
+Releases are built by GitHub Actions when a `v*.*.*` tag is pushed. The workflow creates a draft release with notes from `CHANGELOG.md`.
 
 ## Usage Guide
 
@@ -171,14 +156,21 @@ The app uses `electron-builder` with these features:
 
 ```
 JSONinja/
-├── package.json          # Project configuration & dependencies
-├── main.js               # Electron main process with recent files
-├── preload.js            # Secure IPC bridge
-├── index.html            # Main application UI with new controls
-├── styles.css            # All application styles including themes
-├── renderer.js           # Application logic & state management
-├── CHANGELOG.md          # Version history and features
-└── README.md            # This file
+├── package.json             # Version number and the Tauri CLI
+├── src/                     # The viewer (plain HTML/CSS/JS, no build step)
+│   ├── index.html
+│   ├── styles.css           # All application styles including themes
+│   ├── renderer.js          # Application logic & state management
+│   └── native-bridge.js     # Connects renderer.js to the Rust backend
+├── src-tauri/               # Native side
+│   ├── tauri.conf.json      # Window, security policy, bundling, file associations
+│   ├── capabilities/        # What the page is allowed to call
+│   └── src/
+│       ├── main.rs          # Menus, commands, single instance, opening files
+│       ├── files.rs         # Encoding detection, settings, recent files
+│       └── registry.rs      # Windows "Open with JSONinja" registration
+├── CHANGELOG.md
+└── README.md
 ```
 
 ## Development
@@ -211,9 +203,9 @@ The app uses CSS custom properties for theming:
 ### Common Issues
 
 **App won't start**
-- Ensure Node.js v16+ is installed
-- Run `npm install` to install dependencies
-- Check for error messages in terminal
+- Windows: make sure the Microsoft Edge WebView2 runtime is installed
+- Linux: make sure WebKitGTK 4.1 is installed (`libwebkit2gtk-4.1-0` on Debian/Ubuntu)
+- Building from source: run `npm install` and check the terminal for Rust errors
 
 **JSON won't load**
 - Verify JSON syntax is valid
@@ -240,17 +232,15 @@ The app uses CSS custom properties for theming:
 ### Platform-Specific Notes
 
 **Windows**
-- Uses NSIS installer by default
-- Executable created in `dist/` folder
-- May require Windows Defender exclusion
+- The installer registers JSONinja for `.json` files; the portable exe can do the same from **File > System Integration**
+- Uses the system WebView2 (Chromium-based Edge) engine
 
 **macOS**
-- Requires code signing for distribution
-- Uses standard .app bundle format
+- Uses the system WebKit engine
+- Not yet code-signed or notarized
 
 **Linux**
-- Builds as AppImage by default
-- Can also build .deb and .rpm packages
+- Uses WebKitGTK
 
 ## Contributing
 
@@ -268,7 +258,6 @@ MIT License - feel free to use and modify as needed.
 ## Credits
 
 Built with ❤️ using:
-- Electron - Cross-platform desktop apps
+- Tauri - Small, secure cross-platform desktop apps
 - Modern CSS - Custom properties and grid
 - Vanilla JavaScript - No frameworks needed
-- electron-builder - Packaging and distribution
