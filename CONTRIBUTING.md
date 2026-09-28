@@ -26,6 +26,8 @@ npm run build   # build installers into src-tauri/target/release/bundle/
 
 - `src/renderer.js` - The viewer: tabs, rendering, search, settings (plain JavaScript, no build step)
 - `src/index.html` / `src/styles.css` - Layout and themes
+- `src/formats.js` - Reads JSON, JSON Lines, JSONC and JSON5, and finds where a document fails to parse
+- `src/vendor/` - Bundled third-party code (the `json5` parser), with its license
 - `src/native-bridge.js` - Connects the viewer to the Rust backend
 - `src-tauri/src/main.rs` - Menus, commands, single instance, opening files
 - `src-tauri/src/files.rs` - Encoding detection, settings, recent files

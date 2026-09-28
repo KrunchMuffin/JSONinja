@@ -1268,6 +1268,19 @@ body.show-whitespace .whitespace-tab::before {
   padding-right: 12px;
 }
 
+/* Names the format of JSON Lines, JSONC and JSON5 documents */
+.format-banner {
+  padding: 8px 16px;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.format-banner.warning {
+  color: var(--warning-color);
+}
+
 /* Update banner */
 .update-banner {
   background-color: var(--bg-tertiary);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JSONinja</title>
-<meta name="description" content="A small, free JSON viewer for Windows, macOS and Linux. Formatted, colored and foldable, with tabs, search and huge-file support.">
+<meta name="description" content="A small, free viewer for JSON, JSON Lines, JSONC and JSON5 on Windows, macOS and Linux. Formatted, colored and foldable, with tabs, search and huge-file support.">
 <meta property="og:title" content="JSONinja">
 <meta property="og:description" content="JSON you can actually read. Free and open source.">
 <meta property="og:image" content="https://jsoninja.dabworx.com/screenshot.png">
@@ -296,12 +296,14 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 <div class="group">
 <h3>Opening files</h3>
 <dl>
+<dt>JSON Lines, JSONC and JSON5</dt>
+<dd>Log files and exports with one record per line (<code>.jsonl</code>, <code>.ndjson</code>) show each record labeled with its line. Config files with comments or trailing commas (<code>.jsonc</code>, <code>tsconfig.json</code>) and JSON5 open too, and saving keeps the comments.</dd>
 <dt>Big files</dt>
 <dd>Large files render in chunks so the window stays responsive, and anything over 50,000 lines switches to virtual scrolling, drawing only what's on screen.</dd>
 <dt>Tabs</dt>
 <dd>Keep several files open at once, or paste JSON straight into a new tab.</dd>
 <dt>Double-click, drag and drop, recent files</dt>
-<dd>The installer registers JSONinja for <code>.json</code> files, and one menu item takes you to where Windows lets you make it the default. You can also drop files onto the window or reopen them from the recent list.</dd>
+<dd>The installer registers JSONinja for <code>.json</code>, <code>.jsonl</code>, <code>.ndjson</code>, <code>.jsonc</code> and <code>.json5</code> files, and one menu item takes you to where Windows lets you make it the default. You can also drop files onto the window or reopen them from the recent list.</dd>
 <dt>Odd encodings</dt>
 <dd>Files saved as Latin-1 are detected and shown correctly, and you can reload any file as UTF-8, Latin-1 or Windows-1252.</dd>
 </dl>
@@ -389,7 +391,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 <tr data-asset="rpm"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">Linux .rpm</a></th><td class="size"></td><td class="req">Fedora and openSUSE.</td></tr>
 </tbody>
 </table>
-<p class="fine"><code>.json</code> files still opening in another app on Windows? Use <strong>File &gt; System Integration &gt; Make JSONinja the Default for .json</strong> and pick JSONinja in Settings. If the app you picked before upgrading to Windows 11 25H2 keeps opening them, which is a known issue after that upgrade, click <strong>Reset</strong> at the bottom of Settings &gt; Apps &gt; Default apps and choose JSONinja again. That reset clears your other default apps too.</p>
+<p class="fine">JSON files still opening in another app on Windows? Use <strong>File &gt; System Integration &gt; Make JSONinja the Default for JSON Files</strong> and pick JSONinja in Settings. If the app you picked before upgrading to Windows 11 25H2 keeps opening them, which is a known issue after that upgrade, click <strong>Reset</strong> at the bottom of Settings &gt; Apps &gt; Default apps and choose JSONinja again. That reset clears your other default apps too.</p>
 <p class="fine">Prefer to build it yourself? You need Node.js and Rust; the <a href="https://github.com/KrunchMuffin/JSONinja#building-from-source">README</a> has the steps.</p>
 </div>
 </section>

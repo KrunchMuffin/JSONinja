@@ -17,6 +17,9 @@ use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, Subm
 use tauri::{AppHandle, DragDropEvent, Emitter, Manager, State, WindowEvent, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
+/// Extensions the open and save dialogs offer: JSON, JSON Lines, JSONC and JSON5
+const JSON_EXTENSIONS: [&str; 5] = ["json", "jsonl", "ndjson", "jsonc", "json5"];
+
 /// Menu items whose ids double as the event names renderer.js listens for.
 const RENDERER_ACTIONS: [&str; 7] = [
     "save",
@@ -127,7 +130,7 @@ fn show_open_dialog(app: &AppHandle) {
     let mut dialog = app
         .dialog()
         .file()
-        .add_filter("JSON Files", &["json"])
+        .add_filter("JSON Files", &JSON_EXTENSIONS)
         .add_filter("All Files", &["*"]);
     if let Some(window) = app.get_webview_window("main") {
         dialog = dialog.set_parent(&window);
@@ -243,8 +246,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .item(&item("toggle-settings", "Settings", "CmdOrCtrl+,")?)
         .separator()
         .item(&{
-            let mut integration = SubmenuBuilder::new(app, "System Integration")
-                .text("make-default", "Make JSONinja the Default for .json...");
+            let mut integration = SubmenuBuilder::new(app, "System Integration").text(
+                "make-default",
+                "Make JSONinja the Default for JSON Files...",
+            );
             if is_portable_windows() {
                 integration = integration.text("remove-association", "Remove File Association");
             }
@@ -417,7 +422,7 @@ async fn save_file_as(
     let mut dialog = app
         .dialog()
         .file()
-        .add_filter("JSON Files", &["json"])
+        .add_filter("JSON Files", &JSON_EXTENSIONS)
         .add_filter("All Files", &["*"])
         .set_file_name(suggested_name);
     if let Some(window) = app.get_webview_window("main") {
