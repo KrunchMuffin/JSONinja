@@ -212,7 +212,8 @@ body {
   gap: 12px;
 }
 
-#searchInput {
+#searchInput,
+#searchKeys {
   flex: 1;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
@@ -221,6 +222,10 @@ body {
   border-radius: 4px;
   font-family: var(--font-family);
   font-size: 13px;
+}
+
+#searchKeys {
+  flex: 0 1 240px;
 }
 
 .search-options {
