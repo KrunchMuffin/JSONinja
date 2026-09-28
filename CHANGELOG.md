@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 🔢 **Array indices and string lengths are back** - The `[0]`, `[1]` labels on array items and the "(42 chars)" badges on long strings had stopped appearing after the 1.3 rendering rewrite, although their settings were still there. They work again on files of any size, and they're left out when you select and copy text
+
 ## [2.4.0] - 2026-09-28
 
 ### Added

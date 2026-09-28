@@ -626,6 +626,7 @@ class JSONViewer {
             // Build collapsible regions and bracket levels once
             if (lines.length > 0) {
                 this.collapsibleRegions = this.buildCollapsibleMap(lines);
+                this.lineMeta = this.buildLineMeta(activeTab.jsonData, lines.length);
                 if (this.settings.behavior.rainbowBrackets) {
                     this.bracketLevels = this.calculateBracketLevels(lines);
                 }
@@ -754,6 +755,7 @@ class JSONViewer {
             
             // Build collapsible regions and bracket levels once
             this.collapsibleRegions = this.buildCollapsibleMap(lines);
+            this.lineMeta = this.buildLineMeta(activeTab.jsonData, lines.length);
             if (this.settings.behavior.rainbowBrackets) {
                 this.bracketLevels = this.calculateBracketLevels(lines);
             }
@@ -907,6 +909,7 @@ class JSONViewer {
         
         // Build map of collapsible regions (preserve existing state)
         const newRegions = this.buildCollapsibleMap(lines);
+        this.lineMeta = this.buildLineMeta(data, lines.length);
         if (this.collapsibleRegions) {
             // Preserve collapsed state from existing regions
             Object.keys(newRegions).forEach(lineNumber => {
@@ -1165,6 +1168,66 @@ class JSONViewer {
                trimmed.indexOf('[') < trimmed.indexOf(']');
     }
 
+    // Details the text view can't see on its own: the array index of each
+    // line's value, and the length of its string value. One pass over the data
+    // in JSON.stringify's order, into typed arrays indexed by line (-1 = none).
+    // Skipped entirely when neither badge is turned on.
+    buildLineMeta(data, lineCount) {
+        const { showArrayIndices, showStringLength } = this.settings.behavior;
+        if (!showArrayIndices && !showStringLength) return null;
+
+        const index = new Int32Array(lineCount + 2).fill(-1);
+        const length = new Int32Array(lineCount + 2).fill(-1);
+        let line = 0;
+        const walk = (value, arrayIndex) => {
+            line++;
+            if (arrayIndex >= 0) index[line] = arrayIndex;
+            if (typeof value === 'string') {
+                length[line] = value.length;
+                return;
+            }
+            if (value === null || typeof value !== 'object') return;
+            if (Array.isArray(value)) {
+                if (value.length === 0) return;
+                for (let i = 0; i < value.length; i++) walk(value[i], i);
+            } else {
+                const keys = Object.keys(value);
+                if (keys.length === 0) return;
+                for (const key of keys) walk(value[key], -1);
+            }
+            line++; // the closing bracket
+        };
+        walk(data, -1);
+        return { index, length };
+    }
+
+    // Adds the "[0]" array index before a line's value and the "(42 chars)"
+    // badge after a long string, when those settings are on
+    addLineBadges(highlighted, lineNumber) {
+        const meta = this.lineMeta;
+        if (!meta || lineNumber >= meta.index.length) return highlighted;
+        const { showArrayIndices, showStringLength, stringLengthThreshold } = this.settings.behavior;
+
+        const length = meta.length[lineNumber];
+        if (showStringLength && length > (stringLengthThreshold || 20)) {
+            const start = highlighted.lastIndexOf('<span class="json-string">');
+            if (start !== -1) {
+                const end = highlighted.indexOf('</span>', start) + '</span>'.length;
+                highlighted = highlighted.slice(0, end) +
+                    `<span class="json-length-badge">(${length.toLocaleString()} chars)</span>` +
+                    highlighted.slice(end);
+            }
+        }
+
+        const index = meta.index[lineNumber];
+        if (showArrayIndices && index >= 0) {
+            // After the indentation, which may be drawn as whitespace markers
+            const indent = /^(?:\s|<span class="whitespace-(?:dot|tab)"><\/span>)*/.exec(highlighted)[0];
+            highlighted = indent + `<span class="json-array-index">[${index}]</span>` + highlighted.slice(indent.length);
+        }
+        return highlighted;
+    }
+
     highlightJsonLine(line, lineNumber) {
         let highlighted = this.escapeHtml(line);
         
@@ -1281,6 +1344,8 @@ class JSONViewer {
             highlighted = highlighted.replace(new RegExp(`(<span[^>]*>${bracketChar}</span>)`), `$1<span class="type-badge ${badgeClass}">${badgeText}</span>`);
         }
         
+        highlighted = this.addLineBadges(highlighted, lineNumber);
+
         // Then apply search highlighting on top
         if (this.currentSearchQuery && this.searchResults) {
             const lineMatches = this.searchResults.filter(result => result.lineNumber === lineNumber);

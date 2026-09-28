@@ -580,12 +580,14 @@ body.show-whitespace .whitespace-tab::before {
   font-weight: normal;
 }
 
+/* Labels, not data: kept out of text you select and copy */
 .json-array-index {
   color: var(--text-secondary);
   font-weight: bold;
   font-size: 0.9em;
   margin-right: 8px;
   display: inline-block;
+  user-select: none;
 }
 
 
@@ -595,6 +597,7 @@ body.show-whitespace .whitespace-tab::before {
   font-weight: normal;
   margin-left: 6px;
   opacity: 0.7;
+  user-select: none;
 }
 
 .json-ellipsis {
