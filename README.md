@@ -18,6 +18,7 @@ A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10
 - **Recent Files** - Quick access to your last 10 opened JSON files
 - **Character Encoding Detection** - Automatic detection and handling of files with special characters (Latin-1/ISO-8859-1)
 - **Windows Context Menu** - Right-click any .json file to open directly in JSONinja
+- **Automatic Updates** - Offers new releases when they come out and installs them in one click (Help > Check for Updates Automatically to turn off)
 
 ### 🎨 Customization
 - **4 Built-in Themes** - Dark, Light, GitHub, and Monokai with theme-aware rainbow brackets

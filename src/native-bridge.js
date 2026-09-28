@@ -48,6 +48,20 @@
         onToggleSettings: onEvent('toggle-settings'),
         onToggleSearch: onEvent('toggle-search'),
         onExpandAll: onEvent('expand-all'),
-        onCollapseAll: onEvent('collapse-all')
+        onCollapseAll: onEvent('collapse-all'),
+
+        onUpdateAvailable: onEvent('update-available'),
+        onUpdateProgress: onEvent('update-progress'),
+        // Only settles if the install fails; a successful install restarts the app
+        installUpdate: async () => {
+            try {
+                await invoke('install_update');
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: String(error) };
+            }
+        },
+        dismissUpdate: (version) => invoke('dismiss_update', { version }),
+        openReleasesPage: () => invoke('open_releases_page')
     };
 })();

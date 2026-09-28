@@ -253,6 +253,9 @@ class JSONViewer {
 
     bindNativeEvents() {
         if (window.nativeAPI) {
+            // Before onFileOpened, which tells the backend the page is ready and starts the update check
+            this.bindUpdateBanner();
+
             window.nativeAPI.onFileOpened((event, data) => {
                 
                 // Create new tab and get its ID
@@ -280,6 +283,47 @@ class JSONViewer {
             window.nativeAPI.onExpandAll(() => this.expandAll());
             window.nativeAPI.onCollapseAll(() => this.collapseAll());
         }
+    }
+
+    bindUpdateBanner() {
+        const banner = document.getElementById('updateBanner');
+        const text = document.getElementById('updateText');
+        const installBtn = document.getElementById('updateInstallBtn');
+        let update = null;
+
+        window.nativeAPI.onUpdateAvailable((event, info) => {
+            update = info;
+            text.textContent = `JSONinja ${info.version} is available.`;
+            // The portable exe and Linux deb/rpm can't replace themselves
+            installBtn.textContent = info.canInstall ? 'Install and Restart' : 'Download';
+            installBtn.disabled = false;
+            banner.hidden = false;
+        });
+
+        window.nativeAPI.onUpdateProgress((event, { downloaded, total }) => {
+            const percent = total ? ` ${Math.round((downloaded / total) * 100)}%` : '';
+            text.textContent = `Downloading JSONinja ${update.version}...${percent}`;
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!update.canInstall) {
+                window.nativeAPI.openReleasesPage();
+                return;
+            }
+            installBtn.disabled = true;
+            text.textContent = `Downloading JSONinja ${update.version}...`;
+            const result = await window.nativeAPI.installUpdate();
+            if (!result.success) {
+                text.textContent = `Update failed: ${result.error}`;
+                installBtn.disabled = false;
+            }
+        });
+
+        document.getElementById('updateNotesBtn').addEventListener('click', () => window.nativeAPI.openReleasesPage());
+        document.getElementById('updateDismissBtn').addEventListener('click', () => {
+            banner.hidden = true;
+            window.nativeAPI.dismissUpdate(update.version);
+        });
     }
 
     handleKeyboardShortcuts(e) {

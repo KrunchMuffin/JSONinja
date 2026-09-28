@@ -1109,6 +1109,47 @@ body.show-whitespace .whitespace-tab::before {
   background-color: var(--bg-tertiary);
 }
 
+/* Update banner */
+.update-banner {
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--accent-color);
+  color: var(--text-primary);
+  padding: 8px 40px 8px 16px; /* Room for the close button */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-text {
+  flex: 1;
+}
+
+.update-banner .reload-encoding-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.update-link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.update-banner .close-warning-btn {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 /* Encoding success */
 .encoding-success {
   background-color: #d4edda;
