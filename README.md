@@ -180,7 +180,7 @@ Find a value only where it appears under certain keys, anywhere in the file:
 
 ### Fixing and Editing Files
 - **Broken files** open as text instead of just an error. The bar at the top says what's wrong and where (e.g. *expected `,` or `}` (line 5, column 3)*), that line is highlighted, and **Go to error** jumps to it. It re-checks as you type, and **View formatted** shows the tree once it's valid
-- **Edit JSON** in the sidebar edits any document, and **Ctrl+S** saves it. Saving only writes to files you opened (or picked with Save As), keeps the file's line endings and permissions, and asks before you close a tab with unsaved changes
+- **Edit JSON** in the sidebar edits any document, and **Ctrl+S** saves it. Saving only writes to files you opened (or picked with Save As), keeps the file's line endings and its read/write permission settings (not its owner or access-control lists, which can be reset by the save), and asks before you close a tab with unsaved changes
 - **Very large files** (over 20,000 lines or 2 MB) are too big to edit in JSONinja; if one is broken, it shows the lines around the problem so you can fix it in a text editor
 
 ### View Controls
