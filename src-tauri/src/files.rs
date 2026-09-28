@@ -143,11 +143,38 @@ pub fn write_atomic(path: &Path, content: &str) -> Result<(), String> {
         .to_string_lossy()
         .into_owned();
     let temp = path.with_file_name(format!(".{file_name}.jsoninja-save"));
-    fs::write(&temp, content).map_err(|e| e.to_string())?;
+    let original = fs::metadata(path).ok();
+
+    write_private(&temp, content).map_err(|e| e.to_string())?;
+    // The swapped-in file keeps the original's permissions, so saving a
+    // private file (say, mode 0600) never makes it readable by others
+    if let Some(original) = original {
+        if let Err(e) = fs::set_permissions(&temp, original.permissions()) {
+            let _ = fs::remove_file(&temp);
+            return Err(e.to_string());
+        }
+    }
     fs::rename(&temp, path).map_err(|e| {
         let _ = fs::remove_file(&temp);
         e.to_string()
     })
+}
+
+/// Creates the file readable only by the current user until its final
+/// permissions are set.
+fn write_private(path: &Path, content: &str) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    file.write_all(content.as_bytes())?;
+    file.sync_all()
 }
 
 /// Same folder the Electron builds used, so settings and recent files carry over.
@@ -234,6 +261,38 @@ mod tests {
         let error_at = text.find("\"x\"").unwrap();
         assert_eq!(problem.offset, text[..error_at].encode_utf16().count());
         assert_eq!(problem.column, problem.offset + 1);
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("jsoninja-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn saving_replaces_the_file_and_leaves_no_temp_file() {
+        let dir = temp_dir("save");
+        let path = dir.join("data.json");
+        fs::write(&path, "old").unwrap();
+        write_atomic(&path, "{\"new\": true}").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"new\": true}");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saving_keeps_restrictive_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = temp_dir("perms");
+        let path = dir.join("secret.json");
+        fs::write(&path, "{}").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        write_atomic(&path, "{\"token\": \"x\"}").unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

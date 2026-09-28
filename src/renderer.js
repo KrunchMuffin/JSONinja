@@ -1,3 +1,41 @@
+// Largest document the editor's textarea stays responsive with
+const EDITOR_MAX_LINES = 20000;
+const EDITOR_MAX_CHARS = 2000000;
+// Lines shown on each side of the problem for documents too big to edit
+const EXCERPT_CONTEXT = 100;
+const MAX_LINE_DISPLAY = 2000;
+
+function countLines(text) {
+    let count = 1;
+    for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) count++;
+    return count;
+}
+
+// Lines first..last (1-based, inclusive) without splitting the whole text
+function sliceLines(text, first, last) {
+    let pos = 0;
+    for (let line = 1; line < first; line++) {
+        pos = text.indexOf('\n', pos) + 1;
+        if (pos === 0) return [];
+    }
+    const out = [];
+    for (let line = first; line <= last; line++) {
+        const end = text.indexOf('\n', pos);
+        out.push((end === -1 ? text.slice(pos) : text.slice(pos, end)).replace(/\r$/, ''));
+        if (end === -1) break;
+        pos = end + 1;
+    }
+    return out;
+}
+
+// Keeps huge single lines displayable by showing a window around a column
+function clipLine(line, column) {
+    if (line.length <= MAX_LINE_DISPLAY) return line;
+    const start = Math.max(0, Math.min(column - 1 - MAX_LINE_DISPLAY / 2, line.length - MAX_LINE_DISPLAY));
+    const end = start + MAX_LINE_DISPLAY;
+    return (start > 0 ? '\u2026' : '') + line.slice(start, end) + (end < line.length ? '\u2026' : '');
+}
+
 class JSONViewer {
     constructor() {
         this.tabs = [];
@@ -1512,7 +1550,10 @@ class JSONViewer {
         if (activeTab.editing || !activeTab.jsonData) return;
 
         const formatted = JSON.stringify(activeTab.jsonData, null, 2);
+        // The generated text is LF-only; keep saving with the file's own line endings
+        const lineEnding = activeTab.lineEnding;
         this.loadJsonContent(formatted, activeTab.baseTitle);
+        activeTab.lineEnding = lineEnding;
         this.markDirty(activeTab);
     }
 
@@ -1523,7 +1564,9 @@ class JSONViewer {
         if (activeTab.editing || !activeTab.jsonData) return;
 
         const minified = JSON.stringify(activeTab.jsonData);
+        const lineEnding = activeTab.lineEnding;
         this.loadJsonContent(minified, activeTab.baseTitle);
+        activeTab.lineEnding = lineEnding;
         this.markDirty(activeTab);
     }
 
@@ -1546,6 +1589,10 @@ class JSONViewer {
         const tab = this.getActiveTab();
         if (!tab || (tab.content == null && tab.jsonData === undefined)) return;
         if (tab.content == null) tab.content = JSON.stringify(tab.jsonData, null, 2);
+        if (!this.fitsInEditor(tab.content)) {
+            alert(`"${tab.baseTitle}" is too large to edit in JSONinja (the limit is ${EDITOR_MAX_LINES.toLocaleString()} lines or 2 MB).`);
+            return;
+        }
         tab.editing = true;
         tab.editorScroll = 0;
         this.updateContentUI();
@@ -1570,7 +1617,8 @@ class JSONViewer {
         if (!tab || tab.content == null || !window.nativeAPI || !window.nativeAPI.saveFile) return;
         if (tab.filePath && !tab.dirty) return;
 
-        const content = tab.lineEnding === '\r\n' ? tab.content.replace(/\r?\n/g, '\r\n') : tab.content;
+        const snapshot = tab.content;
+        const content = tab.lineEnding === '\r\n' ? snapshot.replace(/\r?\n/g, '\r\n') : snapshot;
         let result;
         if (tab.filePath) {
             result = await window.nativeAPI.saveFile({ filePath: tab.filePath, content });
@@ -1588,8 +1636,9 @@ class JSONViewer {
             return;
         }
 
-        // Saved files are always UTF-8, whatever encoding they were read with
-        tab.dirty = false;
+        // Saved files are always UTF-8, whatever encoding they were read with.
+        // Anything typed while the save was running still needs saving.
+        tab.dirty = tab.content !== snapshot;
         tab.encoding = 'utf-8';
         tab.hasEncodingIssues = false;
         tab.wasAutoDetected = false;
@@ -1600,7 +1649,88 @@ class JSONViewer {
 
     // A plain-text editor for fixing invalid JSON or editing any document.
     // The error line is marked by a band drawn behind the transparent textarea.
+    // For documents too big to edit: the lines around the problem, read-only
+    async renderProblemExcerpt(tab, contentDiv) {
+        const view = document.createElement('div');
+        view.className = 'json-editor';
+        const bar = document.createElement('div');
+        bar.className = 'editor-bar';
+        const status = document.createElement('span');
+        status.className = 'editor-status';
+        status.setAttribute('role', 'status');
+        status.textContent = 'Checking...';
+        bar.appendChild(status);
+        const note = document.createElement('div');
+        note.className = 'editor-note';
+        const lines = document.createElement('div');
+        lines.className = 'editor-excerpt';
+        view.append(bar, note, lines);
+        contentDiv.appendChild(view);
+
+        const text = tab.content || '';
+        const total = countLines(text);
+        let problem = null;
+        try {
+            JSON.parse(text);
+        } catch (error) {
+            problem = { message: error.message };
+            if (window.nativeAPI && window.nativeAPI.checkJson) {
+                try {
+                    problem = (await window.nativeAPI.checkJson(text)) || problem;
+                } catch (e) {
+                    // Keep the web engine's message
+                }
+            }
+        }
+        if (problem) {
+            const where = problem.line ? ` (line ${problem.line}, column ${problem.column})` : '';
+            status.textContent = `\u2717 ${problem.message}${where}`;
+            status.className = 'editor-status invalid';
+        } else {
+            status.textContent = '\u2713 Valid JSON';
+            status.className = 'editor-status valid';
+        }
+
+        const center = (problem && problem.line) || 1;
+        const first = Math.max(1, center - EXCERPT_CONTEXT);
+        const last = Math.min(total, center + EXCERPT_CONTEXT);
+        const size = `${total.toLocaleString()} ${total === 1 ? 'line' : 'lines'}, ${(text.length / 1048576).toFixed(1)} MB`;
+        const shown = first === last
+            ? `line ${first.toLocaleString()}`
+            : `lines ${first.toLocaleString()}\u2013${last.toLocaleString()}`;
+        note.textContent = `This file is too large to edit in JSONinja (${size}; the limit is ` +
+            `${EDITOR_MAX_LINES.toLocaleString()} lines or 2 MB). Showing ${shown}; fix it in a text editor and reopen it.`;
+
+        let errorRow = null;
+        sliceLines(text, first, last).forEach((line, i) => {
+            const number = first + i;
+            const isError = problem && number === problem.line;
+            const row = document.createElement('div');
+            row.className = isError ? 'excerpt-line error' : 'excerpt-line';
+            const num = document.createElement('span');
+            num.className = 'excerpt-num';
+            num.textContent = String(number);
+            const code = document.createElement('span');
+            code.className = 'excerpt-text';
+            // Very long lines (minified files) show a window around the error
+            code.textContent = clipLine(line, isError ? problem.column : 1);
+            row.append(num, code);
+            lines.appendChild(row);
+            if (isError) errorRow = row;
+        });
+        if (errorRow) errorRow.scrollIntoView({ block: 'center' });
+    }
+
+    // A browser textarea slows to a crawl past ~20,000 lines or a few MB on one line
+    fitsInEditor(text) {
+        return text.length <= EDITOR_MAX_CHARS && countLines(text) <= EDITOR_MAX_LINES;
+    }
+
     renderEditor(tab, contentDiv) {
+        if (!this.fitsInEditor(tab.content || '')) {
+            this.renderProblemExcerpt(tab, contentDiv);
+            return;
+        }
         const editor = document.createElement('div');
         editor.className = 'json-editor';
 
@@ -1650,18 +1780,25 @@ class JSONViewer {
         contentDiv.appendChild(editor);
 
         let problem = null;
-        let lineCount = 0;
+        let lineCount = 1;
         const lineHeight = () => parseFloat(getComputedStyle(textarea).lineHeight) || 20;
         const paddingTop = () => parseFloat(getComputedStyle(textarea).paddingTop) || 0;
 
+        const updateLineCount = () => {
+            lineCount = countLines(textarea.value);
+        };
+        // Only the numbers in view are drawn: a few MB can hold millions of lines
         const renderGutter = () => {
-            const count = textarea.value.split('\n').length;
-            if (count === lineCount) return;
-            lineCount = count;
-            gutterLines.textContent = Array.from({ length: count }, (_, i) => i + 1).join('\n');
+            const height = lineHeight();
+            const first = Math.max(0, Math.floor((textarea.scrollTop - paddingTop()) / height) - 5);
+            const last = Math.min(lineCount, first + Math.ceil(textarea.clientHeight / height) + 10);
+            const numbers = [];
+            for (let n = first + 1; n <= last; n++) numbers.push(n);
+            gutterLines.textContent = numbers.join('\n');
+            gutterLines.style.transform = `translateY(${first * height - textarea.scrollTop}px)`;
         };
         const syncScroll = () => {
-            gutterLines.style.transform = `translateY(${-textarea.scrollTop}px)`;
+            renderGutter();
             if (problem && problem.line) {
                 band.style.top = `${paddingTop() + (problem.line - 1) * lineHeight() - textarea.scrollTop}px`;
             }
@@ -1716,6 +1853,7 @@ class JSONViewer {
         textarea.addEventListener('input', () => {
             tab.content = textarea.value;
             this.markDirty(tab);
+            updateLineCount();
             renderGutter();
             clearTimeout(pending);
             // Re-checking a very large document on every pause would lag typing
@@ -1723,9 +1861,10 @@ class JSONViewer {
         });
         textarea.addEventListener('scroll', syncScroll);
 
-        renderGutter();
+        updateLineCount();
         const firstOpen = tab.editorScroll === undefined;
         textarea.scrollTop = tab.editorScroll || 0;
+        renderGutter();
         check().then(() => {
             // Jump straight to the problem when an invalid file is first opened
             if (firstOpen && problem) goToProblem();

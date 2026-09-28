@@ -1227,6 +1227,47 @@ body.show-whitespace .whitespace-tab::before {
   tab-size: 2;
 }
 
+.editor-note {
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.editor-excerpt {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 0;
+  background-color: var(--bg-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  line-height: 1.5;
+}
+
+.excerpt-line {
+  display: flex;
+  white-space: pre;
+}
+
+.excerpt-line.error {
+  background-color: color-mix(in srgb, var(--error-color) 20%, transparent);
+}
+
+.excerpt-num {
+  flex: none;
+  min-width: 4.5em;
+  padding: 0 10px 0 12px;
+  color: var(--text-secondary);
+  text-align: right;
+  user-select: none;
+}
+
+.excerpt-text {
+  padding-right: 12px;
+}
+
 /* Update banner */
 .update-banner {
   background-color: var(--bg-tertiary);
