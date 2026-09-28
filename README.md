@@ -245,16 +245,13 @@ The app uses CSS custom properties for theming:
 
 ## Contributing
 
-To contribute to this project:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build the app and what to include in a pull request. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
 
 ## License
 
-MIT License - feel free to use and modify as needed.
+[MIT License](LICENSE) - feel free to use and modify as needed.
 
 ## Credits
 

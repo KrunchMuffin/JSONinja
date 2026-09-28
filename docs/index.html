@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSONinja</title>
+<meta name="description" content="A small, free JSON viewer for Windows, macOS and Linux. Formatted, colored and foldable, with tabs, search and huge-file support.">
+<meta property="og:title" content="JSONinja">
+<meta property="og:description" content="JSON you can actually read. Free and open source.">
+<meta property="og:image" content="https://jsoninja.dabworx.com/screenshot.png">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#2D2E32">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Martian+Mono:wdth,wght@75..112.5,400;75..112.5,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --char: #2D2E32;
+  --char-2: #232427;
+  --char-3: #3A3C42;
+  --mask: #FFC83D;
+  --mask-deep: #F29100;
+  --eye: #3B9AE8;
+  --paper: #F5F6F8;
+  --paper-2: #FFFFFF;
+  --ink: #1E2024;
+  --ink-2: #555B66;
+  --rule: #DADDE3;
+  --key-bg: #FFFFFF;
+  --key-edge: #C3C8D1;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Martian Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --wrap: 1160px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #18191C;
+    --paper-2: #202124;
+    --ink: #E8EAEE;
+    --ink-2: #A4AAB5;
+    --rule: #33353B;
+    --key-bg: #26282C;
+    --key-edge: #41444B;
+    --eye: #6DB5F2;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--eye); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--eye); outline-offset: 3px; border-radius: 3px; }
+.wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+@media (max-width: 600px) { .wrap { padding: 0 16px; } }
+code, kbd { font-family: var(--mono); font-size: .82em; font-variation-settings: "wdth" 87.5; }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 16px; top: 16px; z-index: 10; background: #fff; color: #000; padding: 8px 12px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Top bar ---------- */
+.top { background: var(--char); color: #fff; }
+.top .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; font-size: 1.125rem; text-decoration: none; }
+.brand img { width: 32px; height: 32px; }
+.top nav { margin-left: auto; display: flex; gap: 22px; font-weight: 500; font-size: .95rem; }
+.top nav a { color: #fff; text-decoration: none; opacity: .82; }
+.top nav a:hover { opacity: 1; text-decoration: underline; }
+@media (max-width: 640px) { .top nav a:not(.gh) { display: none; } }
+
+/* ---------- Hero ---------- */
+.hero { background: var(--char); color: #fff; padding: 40px 0 0; }
+.intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px 48px; align-items: end; padding-bottom: 40px; }
+@media (max-width: 860px) { .intro { grid-template-columns: 1fr; } }
+h1 {
+  margin: 0;
+  font-size: clamp(2.75rem, 7vw, 5.5rem);
+  line-height: .95;
+  font-weight: 700;
+  font-variation-settings: "wdth" 75;
+  letter-spacing: -.01em;
+  max-width: 11ch;
+}
+.sub { margin: 20px 0 0; max-width: 54ch; color: #C9CCD3; font-size: 1.125rem; }
+
+.get { display: grid; gap: 10px; justify-items: start; }
+.btn {
+  display: inline-flex; align-items: center; gap: 12px;
+  background: var(--mask); color: var(--char);
+  padding: 14px 22px; border-radius: 6px;
+  font-weight: 700; font-size: 1.0625rem; text-decoration: none;
+  box-shadow: 0 3px 0 var(--mask-deep);
+}
+.btn:hover { background: #FFD466; }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--mask-deep); }
+.btn svg { width: 22px; height: 22px; flex: none; }
+.btn small { display: block; font-weight: 500; font-size: .8125rem; opacity: .78; }
+.get-meta { margin: 0; color: #A9ADB6; font-size: .9rem; }
+.get-meta a { color: #fff; }
+
+/* The eye slit: a full-width band holding the JSON you paste */
+.slit { background: var(--mask); color: var(--char); }
+.slit .wrap { display: flex; align-items: stretch; gap: 16px; padding-top: 14px; padding-bottom: 14px; }
+.slit label { flex: none; font-weight: 700; padding-top: 3px; }
+.slit textarea {
+  flex: 1; min-width: 0;
+  background: transparent; color: var(--char);
+  border: 0; resize: none;
+  font: 400 .875rem/1.7 var(--mono);
+  font-variation-settings: "wdth" 87.5;
+  white-space: pre-wrap; word-break: break-all;
+  overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--char) transparent;
+  padding: 2px 0;
+}
+.slit textarea:focus-visible { outline-color: var(--char); outline-offset: 6px; }
+.slit button {
+  flex: none; align-self: flex-start;
+  background: var(--char); color: var(--mask);
+  border: 0; border-radius: 4px; padding: 5px 12px;
+  font: 600 .875rem var(--sans); cursor: pointer;
+}
+@media (max-width: 600px) { .slit .wrap { flex-wrap: wrap; } .slit label { width: 100%; padding: 0; } .slit textarea { flex-basis: 100%; } }
+
+/* Rendered like the app's dark theme */
+.viewer-wrap { background: linear-gradient(var(--char) 0 55%, var(--paper) 55% 100%); padding: 28px 0 0; }
+.viewer {
+  background: #1E1E1E; color: #D4D4D4;
+  border-radius: 8px;
+  border: 1px solid #3E3E42;
+  box-shadow: 0 24px 48px -28px rgba(20, 22, 26, .6);
+  font: 400 .8125rem/1.75 var(--mono);
+  font-variation-settings: "wdth" 87.5;
+  overflow: hidden;
+}
+.viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; background: #252526; border-bottom: 1px solid #3E3E42; font: 500 .8125rem var(--sans); color: #969696; }
+.status { border-radius: 999px; padding: 2px 10px; font-weight: 700; font-size: .75rem; color: #fff; }
+.status.ok { background: #3E8E41; }
+.status.bad { background: #C0392B; }
+.lines { padding: 12px 0 16px; overflow: auto; min-height: 20rem; max-height: 36rem; scrollbar-color: #4A4B50 #1E1E1E; }
+.ln { display: grid; grid-template-columns: 3.2em 1.6em auto; align-items: baseline; white-space: pre; }
+.ln .no { text-align: right; color: #6E7681; user-select: none; }
+.ln .fold {
+  width: 1.6em; padding: 0; border: 0; background: none;
+  color: #858585; cursor: pointer; font: inherit; line-height: inherit;
+}
+.ln .fold:hover { color: #fff; }
+.ln .code { padding-right: 16px; }
+.k { color: #9CDCFE; }
+.s { color: #CE9178; }
+.n { color: #B5CEA8; }
+.b { color: #569CD6; }
+.z { color: #808080; font-style: italic; }
+.more { color: #858585; font-style: italic; }
+.b0 { color: #FF7675; } .b1 { color: #00CEC9; } .b2 { color: #6C5CE7; } .b3 { color: #A29BFE; }
+.b4 { color: #FFEAA7; } .b5 { color: #FD79A8; } .b6 { color: #00B894; } .b7 { color: #E17055; }
+.error { margin: 4px 16px; color: #F48771; white-space: pre-wrap; font-family: var(--sans); font-size: .9375rem; }
+
+/* ---------- Screenshot ---------- */
+.shot { padding: 72px 0 8px; }
+.shot figure { margin: 0; }
+.shot img { border-radius: 8px; box-shadow: 0 0 0 1px var(--rule), 0 24px 48px -24px rgba(20, 22, 26, .45); }
+.shot figcaption { margin-top: 12px; color: var(--ink-2); font-size: .9375rem; }
+
+/* ---------- Content sections ---------- */
+.block { padding: 72px 0; border-top: 1px solid var(--rule); }
+.shot + .block { border-top: 0; }
+h2 {
+  margin: 0 0 8px;
+  font-size: clamp(1.9rem, 3.6vw, 2.75rem);
+  line-height: 1.05;
+  font-weight: 700;
+  font-variation-settings: "wdth" 80;
+}
+.lede { margin: 0 0 40px; max-width: 60ch; color: var(--ink-2); font-size: 1.125rem; }
+
+.groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 64px; }
+@media (max-width: 760px) { .groups { grid-template-columns: 1fr; } }
+.group h3 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 3px solid var(--mask); display: inline-block; font-size: 1.25rem; font-variation-settings: "wdth" 85; }
+.group dl { margin: 0; }
+.group dt { font-weight: 700; margin-top: 16px; }
+.group dd { margin: 2px 0 0; color: var(--ink-2); max-width: 62ch; }
+
+.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px 40px; margin: 0; }
+.keys div { display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+.keys dt { flex: none; width: 10.5rem; }
+.keys dd { margin: 0; color: var(--ink-2); }
+kbd {
+  display: inline-block; min-width: 1.9em; text-align: center;
+  padding: 3px 7px; border-radius: 5px;
+  background: var(--key-bg); border: 1px solid var(--key-edge); box-shadow: 0 2px 0 var(--key-edge);
+  color: var(--ink); font-size: .75rem;
+}
+.plus { color: var(--ink-2); margin: 0 3px; }
+
+.downloads { width: 100%; border-collapse: collapse; }
+.downloads th, .downloads td { text-align: left; padding: 14px 16px 14px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.downloads th { font-weight: 700; white-space: nowrap; }
+.downloads td { color: var(--ink-2); }
+.downloads .size { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.downloads a { font-weight: 600; }
+@media (max-width: 640px) {
+  .downloads thead { display: none; }
+  .downloads tr { display: grid; grid-template-columns: 1fr auto; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .downloads th, .downloads td { border: 0; padding: 2px 0; }
+  .downloads td.req { grid-column: 1 / -1; }
+}
+.fine { margin: 24px 0 0; color: var(--ink-2); font-size: .9375rem; max-width: 70ch; }
+
+.closer { background: var(--mask); color: var(--char); padding: 64px 0; }
+.closer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
+.closer h2 { margin: 0; max-width: 20ch; }
+.closer .btn { background: var(--char); color: var(--mask); box-shadow: 0 3px 0 #000; }
+.closer .btn:hover { background: var(--char-3); }
+
+footer { background: var(--char-2); color: #A9ADB6; padding: 28px 0; font-size: .9375rem; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; justify-content: space-between; }
+footer a { color: #fff; }
+footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+<div class="wrap">
+<a class="brand" href="./"><img src="icon-64.png" alt="" width="32" height="32">JSONinja</a>
+<nav aria-label="Main">
+<a href="#features">Features</a>
+<a href="#shortcuts">Shortcuts</a>
+<a href="#downloads">Downloads</a>
+<a class="gh" href="https://github.com/KrunchMuffin/JSONinja">GitHub</a>
+</nav>
+</div>
+</header>
+
+<main id="main">
+<div class="hero">
+<div class="wrap intro">
+<div>
+<h1>JSON you can actually read.</h1>
+<p class="sub">JSONinja is a small, free viewer for JSON files. Open one and it's formatted, colored and foldable, however big it is. For Windows, macOS and Linux.</p>
+</div>
+<div class="get">
+<a class="btn" id="dl" href="https://github.com/KrunchMuffin/JSONinja/releases/latest">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m6.5 10 5.5 5.5L17.5 10"/><path d="M4 20h16"/></svg>
+<span><span id="dl-label">Download JSONinja</span><small id="dl-meta">Free, from GitHub</small></span>
+</a>
+<p class="get-meta">MIT licensed. <a href="#downloads">All downloads</a></p>
+</div>
+</div>
+
+<div class="slit">
+<div class="wrap">
+<label for="json">Paste JSON</label>
+<textarea id="json" rows="2" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="status">{"id":10248,"status":"shipped","customer":{"name":"Maya Okafor","vip":true},"items":[{"sku":"TNT-2P-GRN","name":"Two-person tent","qty":1,"price":389},{"sku":"MAT-INF-R","qty":2,"price":129.5}],"deliveredAt":null}</textarea>
+<button type="button" id="reset" hidden>Reset</button>
+</div>
+</div>
+
+<div class="viewer-wrap">
+<div class="wrap">
+<div class="viewer">
+<div class="viewer-bar"><span>How JSONinja shows it</span><span class="status ok" id="status" role="status">Valid JSON</span></div>
+<div class="lines" id="out"></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="wrap shot">
+<figure>
+<picture>
+<source srcset="screenshot.webp" type="image/webp">
+<img src="screenshot.png" width="1600" height="1007" alt="JSONinja in its dark theme showing an orders file with line numbers, fold arrows and rainbow brackets." loading="lazy">
+</picture>
+<figcaption>The dark theme, with line numbers, fold arrows and rainbow brackets.</figcaption>
+</figure>
+</div>
+
+<section class="block" id="features" aria-labelledby="features-h">
+<div class="wrap">
+<h2 id="features-h">Made for the files you actually get</h2>
+<p class="lede">API responses, config dumps and exports that arrive as one enormous line. JSONinja opens them fast and lets you find your way around.</p>
+
+<div class="groups">
+<div class="group">
+<h3>Opening files</h3>
+<dl>
+<dt>Big files</dt>
+<dd>Large files render in chunks so the window stays responsive, and anything over 50,000 lines switches to virtual scrolling, drawing only what's on screen.</dd>
+<dt>Tabs</dt>
+<dd>Keep several files open at once, or paste JSON straight into a new tab.</dd>
+<dt>Double-click, drag and drop, recent files</dt>
+<dd>The installer makes JSONinja an option for <code>.json</code> files. You can also drop files onto the window or reopen them from the recent list.</dd>
+<dt>Odd encodings</dt>
+<dd>Files saved as Latin-1 are detected and shown correctly, and you can reload any file as UTF-8, Latin-1 or Windows-1252.</dd>
+</dl>
+</div>
+
+<div class="group">
+<h3>Reading</h3>
+<dl>
+<dt>Fold anything</dt>
+<dd>Collapse any object or array from the gutter, or everything at once with <kbd>Ctrl</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>E</kbd>.</dd>
+<dt>Rainbow brackets</dt>
+<dd>Each nesting level gets its own bracket color, so you can see where a block ends.</dd>
+<dt>Search keys, values or both</dt>
+<dd>Matches are highlighted as you type. Press <kbd>Enter</kbd> for the next one.</dd>
+<dt>Validate, format and minify</dt>
+<dd>See at a glance whether a file parses. Pretty-print it, or squash it back to one line.</dd>
+</dl>
+</div>
+
+<div class="group">
+<h3>Making it yours</h3>
+<dl>
+<dt>Four themes</dt>
+<dd>Dark, Light, GitHub and Monokai.</dd>
+<dt>Fonts and colors</dt>
+<dd>Pick a coding font and size, and set your own colors for keys, strings, numbers, booleans and null.</dd>
+<dt>Line numbers and whitespace</dt>
+<dd>Turn line numbers off, or show tabs and spaces when they matter.</dd>
+</dl>
+</div>
+
+<div class="group">
+<h3>Safety and updates</h3>
+<dl>
+<dt>Nothing in a file can run</dt>
+<dd>JSON is always shown as text. A strict Content Security Policy blocks scripts, and the viewer can only read the files you open.</dd>
+<dt>Signed updates</dt>
+<dd>When a new version comes out, JSONinja offers to install it and restart. Updates are signed, and anything else is refused. You can turn the check off in the Help menu.</dd>
+<dt>Small and open source</dt>
+<dd>It uses the web engine already built into your system, so the Windows installer is about 2 MB. MIT licensed and <a href="https://github.com/KrunchMuffin/JSONinja">built in the open</a>.</dd>
+</dl>
+</div>
+</div>
+</div>
+</section>
+
+<section class="block" id="shortcuts" aria-labelledby="shortcuts-h">
+<div class="wrap">
+<h2 id="shortcuts-h">Keyboard shortcuts</h2>
+<p class="lede">On a Mac, use <kbd>&#8984;</kbd> instead of <kbd>Ctrl</kbd>.</p>
+<dl class="keys">
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>O</kbd></dt><dd>Open a file</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>T</kbd></dt><dd>New tab</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>W</kbd></dt><dd>Close tab</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>F</kbd></dt><dd>Search</dd></div>
+<div><dt><kbd>Enter</kbd></dt><dd>Next match</dd></div>
+<div><dt><kbd>Shift</kbd><span class="plus">+</span><kbd>Enter</kbd></dt><dd>Previous match</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>E</kbd></dt><dd>Expand all</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>Shift</kbd><span class="plus">+</span><kbd>E</kbd></dt><dd>Collapse all</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>,</kbd></dt><dd>Settings</dd></div>
+<div><dt><kbd>Ctrl</kbd><span class="plus">+</span><kbd>=</kbd> <kbd>-</kbd> <kbd>0</kbd></dt><dd>Zoom in, out, reset</dd></div>
+<div><dt><kbd>F11</kbd></dt><dd>Hide the sidebar</dd></div>
+<div><dt><kbd>Esc</kbd></dt><dd>Close search or a dialog</dd></div>
+</dl>
+</div>
+</section>
+
+<section class="block" id="downloads" aria-labelledby="downloads-h">
+<div class="wrap">
+<h2 id="downloads-h">Downloads</h2>
+<p class="lede" id="release-line">Every file comes from the <a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">latest release on GitHub</a>.</p>
+<table class="downloads">
+<thead><tr><th scope="col">Download</th><th scope="col">Size</th><th scope="col">Works on</th></tr></thead>
+<tbody>
+<tr data-asset="windows"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">Windows installer</a></th><td class="size"></td><td class="req">Windows 10 and 11. Sets up the <code>.json</code> file association and automatic updates.</td></tr>
+<tr data-asset="portable"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">Windows portable</a></th><td class="size"></td><td class="req">A single exe with nothing to install. Needs the WebView2 runtime, which Windows 11 and most Windows 10 PCs already have.</td></tr>
+<tr data-asset="mac"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">macOS</a></th><td class="size"></td><td class="req">Apple Silicon and Intel. It isn't notarized yet, so right-click the app and choose Open the first time.</td></tr>
+<tr data-asset="appimage"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">Linux AppImage</a></th><td class="size"></td><td class="req">Most x64 distributions, with automatic updates.</td></tr>
+<tr data-asset="deb"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">Linux .deb</a></th><td class="size"></td><td class="req">Debian and Ubuntu 22.04 or later.</td></tr>
+<tr data-asset="rpm"><th scope="row"><a href="https://github.com/KrunchMuffin/JSONinja/releases/latest">Linux .rpm</a></th><td class="size"></td><td class="req">Fedora and openSUSE.</td></tr>
+</tbody>
+</table>
+<p class="fine">Prefer to build it yourself? You need Node.js and Rust; the <a href="https://github.com/KrunchMuffin/JSONinja#building-from-source">README</a> has the steps.</p>
+</div>
+</section>
+
+<section class="closer" aria-labelledby="closer-h">
+<div class="wrap">
+<h2 id="closer-h">Stop squinting at one-line JSON.</h2>
+<a class="btn" href="#downloads">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m6.5 10 5.5 5.5L17.5 10"/><path d="M4 20h16"/></svg>
+<span>Get JSONinja</span>
+</a>
+</div>
+</section>
+</main>
+
+<footer>
+<div class="wrap">
+<span>&copy; 2026 <a href="https://dabworx.com">DAB Worx Inc.</a> Released under the MIT License.</span>
+<nav aria-label="Project">
+<a href="https://github.com/KrunchMuffin/JSONinja">Source</a>
+<a href="https://github.com/KrunchMuffin/JSONinja/releases">Releases</a>
+<a href="https://github.com/KrunchMuffin/JSONinja/blob/main/CHANGELOG.md">Changelog</a>
+<a href="https://github.com/KrunchMuffin/JSONinja/issues">Report a bug</a>
+</nav>
+</div>
+</footer>
+
+<script>
+(function () {
+  // ---- The demo: renders pasted JSON the way JSONinja does ----
+  var input = document.getElementById("json");
+  var out = document.getElementById("out");
+  var status = document.getElementById("status");
+  var reset = document.getElementById("reset");
+  var original = input.value;
+  var collapsed = {};
+  var MAX_LINES = 500;
+
+  function span(cls, text) {
+    var el = document.createElement("span");
+    if (cls) el.className = cls;
+    el.textContent = text;
+    return el;
+  }
+
+  // Lines the value takes when pretty-printed, counted without building anything
+  function countLines(value) {
+    if (value === null || typeof value !== "object") return 1;
+    var n = 2, empty = true;
+    if (Array.isArray(value)) {
+      for (var i = 0; i < value.length; i++) { n += countLines(value[i]); empty = false; }
+    } else {
+      for (var k in value) { if (Object.prototype.hasOwnProperty.call(value, k)) { n += countLines(value[k]); empty = false; } }
+    }
+    return empty ? 1 : n;
+  }
+
+  function render() {
+    out.textContent = "";
+    var data;
+    try {
+      data = JSON.parse(input.value);
+    } catch (e) {
+      status.textContent = "Invalid JSON";
+      status.className = "status bad";
+      out.appendChild(span("error", e.message));
+      return;
+    }
+    status.textContent = "Valid JSON";
+    status.className = "status ok";
+
+    var lineNo = 0, shown = 0;
+    var frag = document.createDocumentFragment();
+
+    // Each line: number, fold toggle, then the code as colored spans
+    function line(depth, parts, foldPath, isOpen, label) {
+      lineNo++;
+      if (shown >= MAX_LINES) return;
+      shown++;
+      var row = document.createElement("div");
+      row.className = "ln";
+      row.appendChild(span("no", String(lineNo)));
+      if (foldPath !== undefined) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "fold";
+        btn.textContent = isOpen ? "▾" : "▸";
+        btn.setAttribute("aria-expanded", String(isOpen));
+        btn.setAttribute("aria-label", (isOpen ? "Collapse " : "Expand ") + label);
+        btn.dataset.path = foldPath;
+        row.appendChild(btn);
+      } else {
+        row.appendChild(span("", ""));
+      }
+      var code = span("code", "  ".repeat(depth));
+      parts.forEach(function (p) { code.appendChild(p); });
+      row.appendChild(code);
+      frag.appendChild(row);
+    }
+
+    function scalar(v) {
+      if (v === null) return span("z", "null");
+      if (typeof v === "string") return span("s", JSON.stringify(v));
+      if (typeof v === "number") return span("n", String(v));
+      return span("b", String(v));
+    }
+
+    function walk(value, key, depth, path, last) {
+      if (shown >= MAX_LINES) return;
+      var prefix = key === undefined ? [] : [span("k", JSON.stringify(key)), span("", ": ")];
+      var comma = last ? [] : [span("", ",")];
+      var isArray = Array.isArray(value);
+      if (value === null || typeof value !== "object") {
+        line(depth, prefix.concat([scalar(value)], comma));
+        return;
+      }
+      var keys = isArray ? null : Object.keys(value);
+      var count = isArray ? value.length : keys.length;
+      var open = isArray ? "[" : "{", close = isArray ? "]" : "}";
+      var color = "b" + (depth % 8);
+      var label = key === undefined ? (depth === 0 ? "root" : "item") : key;
+      if (!count) {
+        line(depth, prefix.concat([span(color, open + close)], comma));
+        return;
+      }
+      if (collapsed[path]) {
+        line(depth, prefix.concat([span(color, open), span("more", " " + count + (isArray ? " items " : " keys ")), span(color, close)], comma), path, false, label);
+        lineNo += countLines(value) - 1;
+        return;
+      }
+      line(depth, prefix.concat([span(color, open)]), path, true, label);
+      // Stop once the cap is reached; encoded keys keep paths unique even when keys contain "/"
+      for (var i = 0; i < count && shown < MAX_LINES; i++) {
+        var k = isArray ? undefined : keys[i];
+        walk(isArray ? value[i] : value[k], k, depth + 1, path + "/" + encodeURIComponent(isArray ? i : k), i === count - 1);
+      }
+      line(depth, [span(color, close)].concat(comma));
+    }
+
+    walk(data, undefined, 0, "", true);
+    out.appendChild(frag);
+    if (shown >= MAX_LINES) {
+      var total = countLines(data);
+      if (total > shown) {
+        out.appendChild(span("error", "Showing the first " + MAX_LINES + " of " + total.toLocaleString() + " lines. The app shows them all."));
+      }
+    }
+  }
+
+  out.addEventListener("click", function (e) {
+    var btn = e.target.closest(".fold");
+    if (!btn) return;
+    var path = btn.dataset.path;
+    collapsed[path] = !collapsed[path];
+    render();
+    var again = out.querySelector('.fold[data-path="' + CSS.escape(path) + '"]');
+    if (again) again.focus();
+  });
+
+  var pending;
+  input.addEventListener("input", function () {
+    reset.hidden = input.value === original;
+    clearTimeout(pending);
+    pending = setTimeout(function () { collapsed = {}; render(); }, 150);
+  });
+  reset.addEventListener("click", function () {
+    input.value = original;
+    reset.hidden = true;
+    collapsed = {};
+    render();
+    input.focus();
+  });
+  render();
+
+  // ---- Downloads: fill in links and sizes from the latest release ----
+  var uad = navigator.userAgentData;
+  // Phones and tablets can't run it, so they get the downloads table instead of a file
+  var mobile = (uad && uad.mobile) || /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var ua = (uad && uad.platform) || navigator.platform || navigator.userAgent || "";
+  var os = /mac/i.test(ua) ? "mac" : /linux|x11|cros/i.test(ua) ? "appimage" : "windows";
+  var names = { windows: "Windows", mac: "macOS", appimage: "Linux" };
+  var patterns = {
+    windows: /setup.*\.exe$/i,
+    portable: /portable.*\.exe$/i,
+    mac: /\.dmg$/i,
+    appimage: /\.AppImage$/i,
+    deb: /\.deb$/i,
+    rpm: /\.rpm$/i
+  };
+  var dl = document.getElementById("dl");
+  if (mobile) {
+    dl.href = "#downloads";
+    document.getElementById("dl-label").textContent = "See the downloads";
+    document.getElementById("dl-meta").textContent = "For Windows, macOS and Linux";
+  } else {
+    document.getElementById("dl-label").textContent = "Download for " + names[os];
+  }
+
+  function mb(bytes) {
+    var v = bytes / 1048576;
+    return (v < 10 ? v.toFixed(1) : Math.round(v)) + " MB";
+  }
+  // Only ever link to this repository's release files
+  function safe(url) {
+    return /^https:\/\/github\.com\/KrunchMuffin\/JSONinja\/releases\/download\//.test(url);
+  }
+
+  fetch("https://api.github.com/repos/KrunchMuffin/JSONinja/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (release) {
+      var assets = release.assets || [];
+      function find(kind) {
+        return assets.filter(function (a) { return patterns[kind].test(a.name) && safe(a.browser_download_url); })[0];
+      }
+      Object.keys(patterns).forEach(function (kind) {
+        var asset = find(kind);
+        var row = document.querySelector('tr[data-asset="' + kind + '"]');
+        if (!asset || !row) return;
+        row.querySelector("a").href = asset.browser_download_url;
+        row.querySelector(".size").textContent = mb(asset.size);
+      });
+      var mine = !mobile && find(os);
+      if (mine) {
+        dl.href = mine.browser_download_url;
+        document.getElementById("dl-meta").textContent = "Version " + String(release.tag_name).replace(/^v/, "") + ", " + mb(mine.size);
+      }
+    })
+    .catch(function () { /* Links still point at the releases page */ });
+})();
+</script>
+</body>
+</html>
