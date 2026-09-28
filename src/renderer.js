@@ -1573,7 +1573,7 @@ class JSONViewer {
 
     applyDocument(tab, doc) {
         tab.format = doc.format;
-        tab.formatInfo = { records: doc.records, invalid: doc.invalid || [] };
+        tab.formatInfo = { records: doc.records, invalid: doc.invalid || [], nonFinite: doc.nonFinite || 0 };
         if (doc.error) {
             tab.jsonData = null;
             tab.isValid = false;
@@ -1606,6 +1606,10 @@ class JSONViewer {
             alert('JSON Lines files keep one record per line, so they can\'t be formatted or minified as a single document.');
             return false;
         }
+        if (tab.formatInfo && tab.formatInfo.nonFinite) {
+            alert('This JSON5 document contains NaN or Infinity, which plain JSON can\'t represent, so it can\'t be formatted or minified without changing those values.');
+            return false;
+        }
         if (tab.format === 'jsonc' || tab.format === 'json5') {
             return confirm(`This turns the ${JsonFormats.LABELS[tab.format]} document into plain JSON, which removes its comments. Continue?`);
         }
@@ -1632,6 +1636,9 @@ class JSONViewer {
             text = `${label}: the tree shows the data only. Use Edit JSON to see or change the comments.`;
         } else {
             text = `${label}: the tree shows the data as plain JSON. Use Edit JSON to see the original.`;
+            if (tab.formatInfo.nonFinite) {
+                text += ' NaN and Infinity values are shown in quotes, since plain JSON has no way to write them.';
+            }
         }
         banner.textContent = text;
         return banner;

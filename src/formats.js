@@ -67,6 +67,26 @@
         return JSON.parse(stripped.text);
     }
 
+    // JSON5 allows NaN and Infinity, which plain JSON (and so the tree, which
+    // is drawn from JSON.stringify) can't write: they'd silently become null.
+    // They're shown as strings instead, and counted so the viewer can say so.
+    function parseJson5(text) {
+        let count = 0;
+        const visit = (value) => {
+            if (typeof value === 'number') {
+                if (Number.isFinite(value)) return value;
+                count++;
+                return String(value);
+            }
+            if (value && typeof value === 'object') {
+                for (const key of Object.keys(value)) value[key] = visit(value[key]);
+            }
+            return value;
+        };
+        const data = visit(JSON5.parse(text));
+        return { format: 'json5', data, nonFinite: count };
+    }
+
     // One JSON value per non-blank line. Each record is keyed by its line in
     // the file; lines that don't parse are kept as text under a marked key.
     // With stopAtFirstError, gives up as soon as a line doesn't parse.
@@ -106,7 +126,7 @@
         }
         if (declared === 'jsonc' || declared === 'json5') {
             try {
-                return { format: declared, data: declared === 'jsonc' ? parseJsonc(text) : JSON5.parse(text) };
+                return declared === 'jsonc' ? { format: 'jsonc', data: parseJsonc(text) } : parseJson5(text);
             } catch (error) {
                 return { format: declared, error };
             }
@@ -126,7 +146,7 @@
                 // Not JSON with comments either
             }
             try {
-                return { format: 'json5', data: JSON5.parse(text) };
+                return parseJson5(text);
             } catch (e) {
                 // Report it against plain JSON, the format the name suggests
             }
