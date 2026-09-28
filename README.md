@@ -9,6 +9,8 @@ A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10
 - **Large File Support** - Handle massive JSON files with 1+ million lines efficiently
 - **File Operations** - Load JSON files, paste content, or use recent files menu
 - **Real-time Validation** - Instant JSON syntax validation and error reporting
+- **Fix Broken Files** - Invalid JSON opens as text with the exact line and column of the problem highlighted. Fix it, watch it re-check as you type, and save it back
+- **Edit and Save** - Edit any document with **Edit JSON** and save with `Ctrl/Cmd + S`; the file keeps its original line endings
 - **Format & Minify** - Pretty-print or minify JSON with one click
 - **Search & Navigation** - Powerful search with key/value filtering and highlighting
 - **Tree View** - Collapsible JSON structure with state-preserving expand/collapse controls
@@ -40,6 +42,7 @@ A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10
 - `Ctrl/Cmd + T` - New tab
 - `Ctrl/Cmd + W` - Close tab
 - `Ctrl/Cmd + O` - Open file
+- `Ctrl/Cmd + S` - Save
 - `Ctrl/Cmd + F` - Find/Search
 - `Ctrl/Cmd + E` - Expand all
 - `Ctrl/Cmd + Shift + E` - Collapse all

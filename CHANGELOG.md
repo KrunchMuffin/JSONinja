@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🩹 **Fix broken files** - Invalid JSON now opens as text instead of just an error. The problem is described in plain words with its exact line and column (for example "expected `,` or `}` (line 5, column 3)"), that line is highlighted, and **Go to error** jumps to it. It re-checks as you type
+- 💾 **Edit and save** - **Edit JSON** in the sidebar edits any document, and **File > Save** (`Ctrl/Cmd + S`) writes it back. Saving only goes to files you opened or picked with Save As, never leaves a half-written file if something fails, keeps the file's line endings, and asks before closing a tab with unsaved changes. Files are saved as UTF-8
+
+### Fixed
+- A document that's just `0`, `false` or `null` is valid JSON, but was shown as "Invalid JSON: Unknown error"
+
 ## [2.2.0] - 2026-09-27
 
 ### Added

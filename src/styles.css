@@ -1114,6 +1114,119 @@ body.show-whitespace .whitespace-tab::before {
   background-color: var(--bg-tertiary);
 }
 
+/* Editor for fixing invalid JSON or editing any document */
+.json-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+}
+
+.editor-status {
+  flex: 1;
+  font-family: var(--font-family);
+}
+
+.editor-status.invalid {
+  color: var(--error-color);
+}
+
+.editor-status.valid {
+  color: var(--success-color);
+}
+
+.editor-btn {
+  padding: 4px 12px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.editor-btn:hover:not(:disabled) {
+  border-color: var(--accent-color);
+}
+
+.editor-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.editor-btn[hidden] {
+  display: none;
+}
+
+.editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background-color: var(--bg-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  line-height: 1.5;
+}
+
+/* Padding matches the textarea's so the numbers line up with the text */
+.editor-gutter {
+  overflow: hidden;
+  padding: 12px 10px 12px 12px;
+  min-width: 3.5em;
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: pre;
+  user-select: none;
+  border-right: 1px solid var(--border-color);
+}
+
+.editor-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-error-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5em;
+  background-color: color-mix(in srgb, var(--error-color) 20%, transparent);
+  pointer-events: none;
+}
+
+.editor-error-line[hidden] {
+  display: none;
+}
+
+.editor-text {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  line-height: inherit;
+  white-space: pre;
+  overflow: auto;
+  outline: none;
+  tab-size: 2;
+}
+
 /* Update banner */
 .update-banner {
   background-color: var(--bg-tertiary);
