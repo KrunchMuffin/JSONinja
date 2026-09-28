@@ -31,6 +31,7 @@ A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10
 
 ### 🔍 Advanced Search
 - **Multi-mode Search** - Search keys, values, or both
+- **Search Within Keys** - Limit a value search to certain keys, e.g. find "okafor" only in `name` and `email` fields
 - **Real-time Highlighting** - Instant visual feedback
 - **Navigation Controls** - Previous/next result navigation with keyboard shortcuts
 - **Match Counter** - See total matches and current position
@@ -137,6 +138,7 @@ Releases are built by GitHub Actions when a `v*.*.*` tag is pushed. The workflow
 ### Search Functionality
 1. **Open Search** - Press Ctrl+F or click the search icon
 2. **Choose Mode** - Select Keys, Values, or Both
+   - With **Values**, type key names in the **in keys** box (comma-separated, e.g. `name, email`) to only match values under those keys. Array items count under the array's key
 3. **Navigate Results** - Use arrow buttons or Enter/Shift+Enter
 4. **Visual Feedback** - Matches are highlighted in yellow, current match in orange
 

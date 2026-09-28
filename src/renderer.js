@@ -117,13 +117,16 @@ class JSONViewer {
         let searchTimeout;
         const searchInput = document.getElementById('searchInput');
         
-        searchInput.addEventListener('input', (e) => {
+        const searchKeys = document.getElementById('searchKeys');
+        const searchSoon = () => {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => this.performSearch(), 300);
-        });
-        
-        // Add Enter key support for search navigation
-        searchInput.addEventListener('keydown', (e) => {
+        };
+        searchInput.addEventListener('input', searchSoon);
+        searchKeys.addEventListener('input', searchSoon);
+
+        // Add Enter key support for search navigation, from either box
+        const navigateOnEnter = (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault(); // Prevent form submission if in a form
                 
@@ -137,12 +140,18 @@ class JSONViewer {
                     }
                 }
             }
-        });
+        };
+        searchInput.addEventListener('keydown', navigateOnEnter);
+        searchKeys.addEventListener('keydown', navigateOnEnter);
         document.getElementById('searchPrev').addEventListener('click', () => this.previousSearchResult());
         document.getElementById('searchNext').addEventListener('click', () => this.nextSearchResult());
         document.getElementById('closeSearch').addEventListener('click', () => this.hideSearch());
         document.querySelectorAll('input[name="searchType"]').forEach(radio => {
-            radio.addEventListener('change', () => this.performSearch());
+            radio.addEventListener('change', () => {
+                // Limiting by key only applies when searching values
+                searchKeys.hidden = radio.value !== 'value';
+                this.performSearch();
+            });
         });
 
         // Settings panel
@@ -1666,20 +1675,22 @@ class JSONViewer {
         this.currentSearchQuery = query;
         this.currentSearchType = searchType;
         
-        this.searchResults = this.findMatchesInLines(activeTab.jsonData, query, searchType);
+        const keyFilter = searchType === 'value' ? this.parseKeyFilter(document.getElementById('searchKeys').value) : null;
+        this.searchResults = this.findMatchesInLines(activeTab.jsonData, query, searchType, keyFilter);
         this.updateSearchResults(this.searchResults.length, this.searchResults.length > 0 ? 1 : 0);
         
         // Re-render to apply search highlighting
         this.updateActiveTabView();
         
-        // Restore focus to search input after re-render
+        // Restore focus to whichever search box was being typed in after re-render
+        const typingIn = document.activeElement && document.activeElement.id === 'searchKeys' ? 'searchKeys' : 'searchInput';
         setTimeout(() => {
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput && document.activeElement !== searchInput) {
-                searchInput.focus();
+            const box = document.getElementById(typingIn);
+            if (box && document.activeElement !== box) {
+                box.focus();
                 // Restore cursor position
-                const cursorPos = query.length;
-                searchInput.setSelectionRange(cursorPos, cursorPos);
+                const cursorPos = box.value.length;
+                box.setSelectionRange(cursorPos, cursorPos);
             }
         }, 0);
 
@@ -1692,7 +1703,32 @@ class JSONViewer {
         }
     }
 
-    findMatchesInLines(data, query, searchType) {
+    // "name, email" -> Set { "name", "email" }; empty means no filter
+    parseKeyFilter(text) {
+        const keys = text.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+        return keys.length ? new Set(keys) : null;
+    }
+
+    // The key each line of the pretty-printed JSON belongs to. Array items
+    // and closing brackets belong to the key that holds them.
+    buildLineKeys(data) {
+        const lineKeys = [];
+        let line = 0;
+        const walk = (value, key) => {
+            lineKeys[++line] = key;
+            if (value === null || typeof value !== 'object') return;
+            const children = Array.isArray(value)
+                ? value.map(item => [key, item])
+                : Object.keys(value).map(k => [k, value[k]]);
+            if (children.length === 0) return;
+            children.forEach(([childKey, child]) => walk(child, childKey));
+            lineKeys[++line] = key;
+        };
+        walk(data, undefined);
+        return lineKeys;
+    }
+
+    findMatchesInLines(data, query, searchType, keyFilter = null) {
         const matches = [];
         const searchQuery = query.toLowerCase();
         const jsonText = JSON.stringify(data, null, 2);
@@ -1736,8 +1772,9 @@ class JSONViewer {
                 // Look for non-string values (numbers, booleans, null)
                 // More specific patterns to avoid duplicates
                 const patterns = [
-                    /:\s*(true|false|null)(?=[,\s\]\}])/gi,  // booleans and null
-                    /:\s*(-?\d+\.?\d*)(?=[,\s\]\}])/g        // numbers
+                    // After a colon, or on their own line as array items
+                    /(?:^\s*|:\s*)(true|false|null)(?=[,\s\]\}]|$)/gi,  // booleans and null
+                    /(?:^\s*|:\s*)(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?=[,\s\]\}]|$)/g  // numbers, including 1e+21
                 ];
                 
                 patterns.forEach(pattern => {
@@ -1756,7 +1793,14 @@ class JSONViewer {
                 });
             }
         });
-        
+
+        if (keyFilter) {
+            const lineKeys = this.buildLineKeys(data);
+            return matches.filter(match => {
+                const key = lineKeys[match.lineNumber];
+                return key !== undefined && keyFilter.has(key.toLowerCase());
+            });
+        }
         return matches;
     }
 
