@@ -21,7 +21,7 @@ jobs:
       tag: ${{ steps.info.outputs.tag }}
       release_id: ${{ steps.release.outputs.id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Extract changelog for this version
         id: info
@@ -72,7 +72,7 @@ jobs:
             args: ''
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
