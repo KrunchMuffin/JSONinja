@@ -145,28 +145,55 @@ fn toggle_fullscreen(app: &AppHandle) {
     }
 }
 
+/// Windows only lets the user choose a default app, in Settings. Make sure
+/// JSONinja is registered, then open its page there.
 #[cfg(windows)]
-fn set_file_handler(app: &AppHandle, register: bool) {
-    let result = std::env::current_exe().and_then(|exe| {
-        if register {
-            registry::register(&exe)
-        } else {
-            registry::unregister(&exe)
+fn make_default_app(app: &AppHandle) {
+    use tauri_plugin_opener::OpenerExt;
+
+    // The installer registers JSONinja itself; the portable exe does it here
+    if !registry::is_installed() {
+        if let Err(e) = std::env::current_exe().and_then(|exe| registry::register(&exe)) {
+            return show_error(app, format!("Couldn't register JSONinja with Windows: {e}"));
         }
-    });
-    match (result, register) {
-        (Ok(()), true) => show_info(
+    }
+    // Windows 10 ignores the app parameter and shows the general Default apps page
+    let page = format!(
+        "ms-settings:defaultapps?registeredAppUser={}",
+        registry::REGISTERED_APP
+    );
+    if let Err(e) = app.opener().open_url(page, None::<&str>) {
+        show_error(app, format!("Couldn't open Windows Settings: {e}"));
+    }
+}
+
+#[cfg(windows)]
+fn remove_file_association(app: &AppHandle) {
+    match std::env::current_exe().and_then(|exe| registry::unregister(&exe)) {
+        Ok(()) => show_info(
             app,
-            "Success",
-            "JSONinja has been registered as a JSON file handler.\n\nYou can now right-click JSON files and select \"Open with JSONinja\".".into(),
+            "File Association Removed",
+            "JSONinja is no longer registered for .json files.".into(),
         ),
-        (Ok(()), false) => show_info(app, "Success", "JSONinja file associations have been removed.".into()),
-        (Err(e), _) => show_error(app, format!("Failed to update file association: {e}")),
+        Err(e) => show_error(app, format!("Couldn't remove the file association: {e}")),
+    }
+}
+
+/// The installer's uninstaller cleans up after itself; only the portable exe
+/// needs a way to undo its registration
+fn is_portable_windows() -> bool {
+    #[cfg(windows)]
+    {
+        !registry::is_installed()
+    }
+    #[cfg(not(windows))]
+    {
+        false
     }
 }
 
 #[cfg(target_os = "macos")]
-fn set_file_handler(app: &AppHandle, _register: bool) {
+fn make_default_app(app: &AppHandle) {
     show_info(
         app,
         "macOS File Association",
@@ -175,7 +202,7 @@ fn set_file_handler(app: &AppHandle, _register: bool) {
 }
 
 #[cfg(target_os = "linux")]
-fn set_file_handler(app: &AppHandle, _register: bool) {
+fn make_default_app(app: &AppHandle) {
     show_info(
         app,
         "Linux File Association",
@@ -212,12 +239,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .separator()
         .item(&item("toggle-settings", "Settings", "CmdOrCtrl+,")?)
         .separator()
-        .item(
-            &SubmenuBuilder::new(app, "System Integration")
-                .text("register-handler", "Register as JSON Handler")
-                .text("unregister-handler", "Unregister as JSON Handler")
-                .build()?,
-        );
+        .item(&{
+            let mut integration = SubmenuBuilder::new(app, "System Integration")
+                .text("make-default", "Make JSONinja the Default for .json...");
+            if is_portable_windows() {
+                integration = integration.text("remove-association", "Remove File Association");
+            }
+            integration.build()?
+        });
     // macOS keeps Quit in the app menu
     if !cfg!(target_os = "macos") {
         file_menu = file_menu.separator().quit();
@@ -288,8 +317,9 @@ fn handle_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => show_open_dialog(app),
         "fullscreen" => toggle_fullscreen(app),
-        "register-handler" => set_file_handler(app, true),
-        "unregister-handler" => set_file_handler(app, false),
+        "make-default" => make_default_app(app),
+        #[cfg(windows)]
+        "remove-association" => remove_file_association(app),
         "check-updates" => {
             tauri::async_runtime::spawn(updates::check(app.clone(), true));
         }

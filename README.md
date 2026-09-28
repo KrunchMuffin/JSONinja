@@ -235,7 +235,7 @@ The app uses CSS custom properties for theming:
 ### Platform-Specific Notes
 
 **Windows**
-- The installer registers JSONinja for `.json` files; the portable exe can do the same from **File > System Integration**
+- The installer registers JSONinja for `.json` files and lists it in **Settings > Default apps**. Windows only lets you choose a default app yourself, so if `.json` files still open in something else, use **File > System Integration > Make JSONinja the Default for .json...**, which opens JSONinja's page in Settings. The portable exe registers itself the same way when you use that menu item
 - Uses the system WebView2 (Chromium-based Edge) engine
 
 **macOS**

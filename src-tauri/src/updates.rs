@@ -78,11 +78,7 @@ pub fn dismiss(app: &AppHandle, version: String) {
 fn can_self_update() -> bool {
     #[cfg(windows)]
     {
-        // The NSIS installer puts its uninstaller next to the exe
-        std::env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(|dir| dir.join("uninstall.exe").exists()))
-            .unwrap_or(false)
+        crate::registry::is_installed()
     }
     #[cfg(target_os = "linux")]
     {
