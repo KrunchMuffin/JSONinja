@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-27
+
 ### Added
 - 🔎 **Search Within Keys** - When searching values, list key names in the new **in keys** box (e.g. `name, email`) to only match values under those keys, anywhere in the file. Array items count under the array's key
 
 ### Fixed
-- 🔢 **Search misses** - Numbers, `true`, `false` and `null` are now found when they're array items or the last value in an object
+- 🔢 **Search misses** - Numbers (including exponent forms like `1e-7`), `true`, `false` and `null` are now found when they're array items or the last value in an object
 
 ## [2.0.0] - 2026-09-27
 
