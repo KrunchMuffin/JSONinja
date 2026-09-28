@@ -96,7 +96,7 @@ jobs:
       - run: npm ci
 
       # Signs the update files and uploads latest.json, which installed copies check for updates
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
