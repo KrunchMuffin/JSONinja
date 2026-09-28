@@ -1774,7 +1774,7 @@ class JSONViewer {
                 const patterns = [
                     // After a colon, or on their own line as array items
                     /(?:^\s*|:\s*)(true|false|null)(?=[,\s\]\}]|$)/gi,  // booleans and null
-                    /(?:^\s*|:\s*)(-?\d+\.?\d*)(?=[,\s\]\}]|$)/g        // numbers
+                    /(?:^\s*|:\s*)(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?=[,\s\]\}]|$)/g  // numbers, including 1e+21
                 ];
                 
                 patterns.forEach(pattern => {
