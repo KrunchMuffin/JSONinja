@@ -210,6 +210,10 @@ The app uses CSS custom properties for theming:
 - Linux: make sure WebKitGTK 4.1 is installed (`libwebkit2gtk-4.1-0` on Debian/Ubuntu)
 - Building from source: run `npm install` and check the terminal for Rust errors
 
+**.json files still open in another app (Windows)**
+- Windows only lets you choose a default app yourself: use **File > System Integration > Make JSONinja the Default for .json...** and pick JSONinja in Settings
+- If they still open in the app you used before, it's a known issue on Windows 11 25H2: Settings saves your new choice, but an older saved choice from a previous Windows version can take priority. Go to **Settings > Apps > Default apps**, click **Reset** at the bottom, then make JSONinja the default again. Resetting also clears your choices for other file types
+
 **JSON won't load**
 - Verify JSON syntax is valid
 - Check file encoding (should be UTF-8)
