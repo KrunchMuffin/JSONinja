@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-09-28
+
 ### Fixed
 - 🔢 **Array indices and string lengths are back** - The `[0]`, `[1]` labels on array items and the "(42 chars)" badges on long strings had stopped appearing after the 1.3 rendering rewrite, although their settings were still there. They work again on files of any size, and they're left out when you select and copy text
+
+### Changed
+- ℹ️ **About and credits** - The About box and Settings mention the formats JSONinja opens, and credit the bundled json5 library
 
 ## [2.4.0] - 2026-09-28
 
