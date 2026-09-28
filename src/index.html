@@ -10,6 +10,14 @@
 
 <body>
     <div id="app">
+        <!-- Shown by renderer.js when a newer release is published -->
+        <div class="update-banner" id="updateBanner" hidden>
+            <span class="update-text" id="updateText"></span>
+            <button class="reload-encoding-btn" id="updateInstallBtn"></button>
+            <button class="update-link-btn" id="updateNotesBtn">What's new</button>
+            <button class="close-warning-btn" id="updateDismissBtn" title="Don't show this version again">&times;</button>
+        </div>
+
         <!-- Header with tabs -->
         <header class="header">
             <div class="tab-container">

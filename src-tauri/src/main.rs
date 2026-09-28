@@ -4,6 +4,7 @@
 mod files;
 #[cfg(windows)]
 mod registry;
+mod updates;
 
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -11,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde_json::Value;
-use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, DragDropEvent, Emitter, Manager, State, WindowEvent, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
@@ -242,6 +243,13 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .build()?;
 
     let help_menu = SubmenuBuilder::new(app, "Help")
+        .text("check-updates", "Check for Updates...")
+        .item(
+            &CheckMenuItemBuilder::with_id("auto-update", "Check for Updates Automatically")
+                .checked(updates::load_settings(app).auto_check)
+                .build(app)?,
+        )
+        .separator()
         .text("about", "About JSONinja")
         .build()?;
 
@@ -282,6 +290,13 @@ fn handle_menu(app: &AppHandle, id: &str) {
         "fullscreen" => toggle_fullscreen(app),
         "register-handler" => set_file_handler(app, true),
         "unregister-handler" => set_file_handler(app, false),
+        "check-updates" => {
+            tauri::async_runtime::spawn(updates::check(app.clone(), true));
+        }
+        "auto-update" => {
+            updates::toggle_auto_check(app);
+            refresh_menu(app);
+        }
         "about" => show_info(
             app,
             "About JSONinja",
@@ -311,6 +326,11 @@ fn frontend_ready(app: AppHandle) {
         std::mem::take(&mut inner.pending)
     };
     open_paths(&app, pending);
+
+    // Checking now means the renderer is listening for the result
+    if updates::load_settings(&app).auto_check {
+        tauri::async_runtime::spawn(updates::check(app.clone(), false));
+    }
 }
 
 #[tauri::command]
@@ -332,6 +352,21 @@ fn reload_with_encoding(
 }
 
 #[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    updates::install(app).await
+}
+
+#[tauri::command]
+fn dismiss_update(app: AppHandle, version: String) {
+    updates::dismiss(&app, version);
+}
+
+#[tauri::command]
+fn open_releases_page(app: AppHandle) {
+    updates::open_releases_page(&app);
+}
+
+#[tauri::command]
 fn load_settings(app: AppHandle) -> Result<Option<Value>, String> {
     files::load_settings(&app)
 }
@@ -350,6 +385,8 @@ fn main() {
             open_paths(app, file_args(args, Path::new(&cwd)));
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
         .setup(|app| {
             let handle = app.handle();
@@ -370,7 +407,10 @@ fn main() {
             open_file_dialog,
             reload_with_encoding,
             load_settings,
-            save_settings
+            save_settings,
+            install_update,
+            dismiss_update,
+            open_releases_page
         ])
         .build(tauri::generate_context!())
         .expect("error while building JSONinja");

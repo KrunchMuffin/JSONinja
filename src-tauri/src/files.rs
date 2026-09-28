@@ -95,7 +95,7 @@ pub fn read_with_encoding(path: &Path, encoding: &str) -> Result<OpenedFile, Str
 }
 
 /// Same folder the Electron builds used, so settings and recent files carry over.
-fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .config_dir()
