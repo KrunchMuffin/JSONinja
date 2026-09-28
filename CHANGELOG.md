@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-09-27
 
 ### Changed
 - 🪶 **Rebuilt on Tauri** - JSONinja now uses the system's built-in web engine instead of bundling Chromium. The Windows installer drops from 84 MB to about 1.3 MB, and the portable exe is about 3.6 MB
