@@ -9,6 +9,7 @@ A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10
 - **Large File Support** - Handle massive JSON files with 1+ million lines efficiently
 - **File Operations** - Load JSON files, paste content, or use recent files menu
 - **Real-time Validation** - Instant JSON syntax validation and error reporting
+- **JSON Lines, JSONC and JSON5** - Opens `.jsonl`/`.ndjson` (one record per line, each labeled with its line, with unreadable lines flagged individually), JSON with comments (`.jsonc`, and `.json` files like `tsconfig.json` that contain comments), and JSON5. Saving keeps the original format, comments included
 - **Fix Broken Files** - Invalid JSON opens as text with the exact line and column of the problem highlighted. Fix it, watch it re-check as you type, and save it back
 - **Edit and Save** - Edit any document with **Edit JSON** and save with `Ctrl/Cmd + S`; the file keeps its original line endings
 - **Format & Minify** - Pretty-print or minify JSON with one click
@@ -214,7 +215,7 @@ The app uses CSS custom properties for theming:
 - Building from source: run `npm install` and check the terminal for Rust errors
 
 **.json files still open in another app (Windows)**
-- Windows only lets you choose a default app yourself: use **File > System Integration > Make JSONinja the Default for .json...** and pick JSONinja in Settings
+- Windows only lets you choose a default app yourself: use **File > System Integration > Make JSONinja the Default for JSON Files...** and pick JSONinja in Settings
 - If they still open in the app you used before, it's a known issue on Windows 11 25H2: Settings saves your new choice, but an older saved choice from a previous Windows version can take priority. Go to **Settings > Apps > Default apps**, click **Reset** at the bottom, then make JSONinja the default again. Resetting also clears your choices for other file types
 
 **JSON won't load**
@@ -242,7 +243,7 @@ The app uses CSS custom properties for theming:
 ### Platform-Specific Notes
 
 **Windows**
-- The installer registers JSONinja for `.json` files and lists it in **Settings > Default apps**. Windows only lets you choose a default app yourself, so if `.json` files still open in something else, use **File > System Integration > Make JSONinja the Default for .json...**, which opens JSONinja's page in Settings. The portable exe registers itself the same way when you use that menu item
+- The installer registers JSONinja for `.json`, `.jsonl`, `.ndjson`, `.jsonc` and `.json5` files and lists it in **Settings > Default apps**. Windows only lets you choose a default app yourself, so if these files still open in something else, use **File > System Integration > Make JSONinja the Default for JSON Files...**, which opens JSONinja's page in Settings. The portable exe registers itself the same way when you use that menu item
 - Uses the system WebView2 (Chromium-based Edge) engine
 
 **macOS**

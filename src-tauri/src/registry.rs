@@ -16,11 +16,20 @@ use winreg::RegKey;
 /// The value name under RegisteredApplications, which Settings links take
 pub const REGISTERED_APP: &str = "JSONinja";
 
-const PROG_ID: &str = "JSONinja.json";
+/// Extension, ProgID and file type description. Keep in sync with
+/// fileAssociations in tauri.conf.json and windows/hooks.nsh.
+const ASSOCIATIONS: [(&str, &str, &str); 5] = [
+    ("json", "JSONinja.json", "JavaScript Object Notation File"),
+    ("jsonl", "JSONinja.jsonl", "JSON Lines File"),
+    ("ndjson", "JSONinja.jsonl", "JSON Lines File"),
+    ("jsonc", "JSONinja.jsonc", "JSON with Comments File"),
+    ("json5", "JSONinja.json5", "JSON5 File"),
+];
+/// Whoever this ProgID's command points at owns the shared registration
+const MAIN_PROG_ID: &str = "JSONinja.json";
 /// Used by the 1.x and 2.0 "Register as JSON Handler" menu item
 const LEGACY_PROG_ID: &str = "JSONinja.Document";
 const CAPABILITIES: &str = r"Software\JSONinja\Capabilities";
-const CONTEXT_MENU: &str = r"SystemFileAssociations\.json\shell\Open with JSONinja";
 
 fn hkcu() -> RegKey {
     RegKey::predef(HKEY_CURRENT_USER)
@@ -34,6 +43,10 @@ fn exe_name(exe: &Path) -> String {
     exe.file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "jsoninja.exe".to_string())
+}
+
+fn context_menu(ext: &str) -> String {
+    format!(r"SystemFileAssociations\.{ext}\shell\Open with JSONinja")
 }
 
 /// Whether this exe was installed by the NSIS installer, which puts its
@@ -52,48 +65,52 @@ fn set(root: &RegKey, key: &str, name: &str, value: &str) -> io::Result<()> {
 
 pub fn register(exe: &Path) -> io::Result<()> {
     let classes = classes()?;
-    let exe_name = exe_name(exe);
+    let hkcu = hkcu();
     let command = format!("\"{}\" \"%1\"", exe.display());
     let icon = format!("\"{}\",0", exe.display());
 
-    set(&classes, PROG_ID, "", "JavaScript Object Notation File")?;
-    set(&classes, &format!(r"{PROG_ID}\DefaultIcon"), "", &icon)?;
-    set(
-        &classes,
-        &format!(r"{PROG_ID}\shell\open"),
-        "FriendlyAppName",
-        "JSONinja",
-    )?;
-    set(
-        &classes,
-        &format!(r"{PROG_ID}\shell\open\command"),
-        "",
-        &command,
-    )?;
-    set(&classes, r".json\OpenWithProgids", PROG_ID, "")?;
-    set(
-        &classes,
-        &format!(r"Applications\{exe_name}\shell\open\command"),
-        "",
-        &command,
-    )?;
-    set(&classes, CONTEXT_MENU, "", "Open with JSONinja")?;
-    set(&classes, CONTEXT_MENU, "Icon", &icon)?;
-    set(&classes, &format!(r"{CONTEXT_MENU}\command"), "", &command)?;
+    for (ext, prog_id, description) in ASSOCIATIONS {
+        set(&classes, prog_id, "", description)?;
+        set(&classes, &format!(r"{prog_id}\DefaultIcon"), "", &icon)?;
+        set(
+            &classes,
+            &format!(r"{prog_id}\shell\open"),
+            "FriendlyAppName",
+            "JSONinja",
+        )?;
+        set(
+            &classes,
+            &format!(r"{prog_id}\shell\open\command"),
+            "",
+            &command,
+        )?;
+        set(&classes, &format!(r".{ext}\OpenWithProgids"), prog_id, "")?;
 
-    let hkcu = hkcu();
+        let menu = context_menu(ext);
+        set(&classes, &menu, "", "Open with JSONinja")?;
+        set(&classes, &menu, "Icon", &icon)?;
+        set(&classes, &format!(r"{menu}\command"), "", &command)?;
+
+        set(
+            &hkcu,
+            &format!(r"{CAPABILITIES}\FileAssociations"),
+            &format!(".{ext}"),
+            prog_id,
+        )?;
+    }
+    set(
+        &classes,
+        &format!(r"Applications\{}\shell\open\command", exe_name(exe)),
+        "",
+        &command,
+    )?;
+
     set(&hkcu, CAPABILITIES, "ApplicationName", "JSONinja")?;
     set(
         &hkcu,
         CAPABILITIES,
         "ApplicationDescription",
-        "A small, fast JSON viewer",
-    )?;
-    set(
-        &hkcu,
-        &format!(r"{CAPABILITIES}\FileAssociations"),
-        ".json",
-        PROG_ID,
+        "A small, fast viewer for JSON, JSON Lines, JSONC and JSON5",
     )?;
     set(
         &hkcu,
@@ -108,13 +125,12 @@ pub fn register(exe: &Path) -> io::Result<()> {
 
 pub fn unregister(exe: &Path) -> io::Result<()> {
     let classes = classes()?;
-    let exe_name = exe_name(exe);
     let command = format!("\"{}\" \"%1\"", exe.display());
 
     // The installed copy uses the same names, so only remove what points at
     // this exe; otherwise an installed JSONinja would disappear from Default
     // apps. Missing keys and values are fine: they may never have been registered.
-    let app_key = format!(r"Applications\{exe_name}");
+    let app_key = format!(r"Applications\{}", exe_name(exe));
     if points_to(
         &classes,
         &format!(r"{app_key}\shell\open\command"),
@@ -122,19 +138,25 @@ pub fn unregister(exe: &Path) -> io::Result<()> {
     ) {
         let _ = classes.delete_subkey_all(&app_key);
     }
-    if points_to(&classes, &format!(r"{CONTEXT_MENU}\command"), &command) {
-        let _ = classes.delete_subkey_all(CONTEXT_MENU);
+    for (ext, _, _) in ASSOCIATIONS {
+        let menu = context_menu(ext);
+        if points_to(&classes, &format!(r"{menu}\command"), &command) {
+            let _ = classes.delete_subkey_all(&menu);
+        }
     }
+
     if points_to(
         &classes,
-        &format!(r"{PROG_ID}\shell\open\command"),
+        &format!(r"{MAIN_PROG_ID}\shell\open\command"),
         &command,
     ) {
-        let _ = classes.delete_subkey_all(PROG_ID);
-        if let Ok(progids) =
-            classes.open_subkey_with_flags(r".json\OpenWithProgids", KEY_ALL_ACCESS)
-        {
-            let _ = progids.delete_value(PROG_ID);
+        for (ext, prog_id, _) in ASSOCIATIONS {
+            let _ = classes.delete_subkey_all(prog_id);
+            if let Ok(progids) =
+                classes.open_subkey_with_flags(format!(r".{ext}\OpenWithProgids"), KEY_ALL_ACCESS)
+            {
+                let _ = progids.delete_value(prog_id);
+            }
         }
 
         let hkcu = hkcu();

@@ -49,6 +49,26 @@
         "description": "JavaScript Object Notation File",
         "mimeType": "application/json",
         "role": "Editor"
+      },
+      {
+        "ext": ["jsonl", "ndjson"],
+        "name": "JSONinja.jsonl",
+        "description": "JSON Lines File",
+        "mimeType": "application/jsonl",
+        "role": "Editor"
+      },
+      {
+        "ext": ["jsonc"],
+        "name": "JSONinja.jsonc",
+        "description": "JSON with Comments File",
+        "role": "Editor"
+      },
+      {
+        "ext": ["json5"],
+        "name": "JSONinja.json5",
+        "description": "JSON5 File",
+        "mimeType": "application/json5",
+        "role": "Editor"
       }
     ],
     "windows": {

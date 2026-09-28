@@ -540,6 +540,10 @@ class JSONViewer {
             }
         }
 
+        if (!activeTab.editing && activeTab.isValid && activeTab.format && activeTab.format !== 'json') {
+            contentDiv.appendChild(this.createFormatBanner(activeTab));
+        }
+
         if (activeTab.editing) {
             this.renderEditor(activeTab, contentDiv);
         } else if (activeTab.jsonData) {
@@ -1465,23 +1469,10 @@ class JSONViewer {
         activeTab.editorScroll = undefined;
         // Saving writes these back, so a CRLF file stays CRLF
         activeTab.lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
-        try {
-            const jsonData = JSON.parse(content);
-            activeTab.content = content;
-            activeTab.jsonData = jsonData;
-            activeTab.isValid = true;
-            activeTab.error = null;
-            activeTab.editing = false;
-            // Don't overwrite encoding metadata if it exists
-        } catch (error) {
-            // Open it as text so it can be fixed
-            activeTab.content = content;
-            activeTab.jsonData = null;
-            activeTab.isValid = false;
-            activeTab.error = error.message;
-            activeTab.editing = true;
-            // Don't overwrite encoding metadata if it exists
-        }
+        // JSON, JSON Lines, JSON with comments or JSON5, by file name or content.
+        // Invalid documents open as text so they can be fixed.
+        activeTab.content = content;
+        this.applyDocument(activeTab, JsonFormats.parseDocument(content, title));
         this.setTabTitle(activeTab);
 
 
@@ -1530,16 +1521,22 @@ class JSONViewer {
         }
     }
 
-    validateCurrentTab() {
-        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
-        if (!activeTab || !activeTab.content) return;
+    async validateCurrentTab() {
+        const tab = this.getActiveTab();
+        if (!tab || !tab.content) return;
 
-        try {
-            JSON.parse(activeTab.content);
-            alert('✓ Valid JSON');
-        } catch (error) {
-            alert('✗ Invalid JSON: ' + error.message);
+        const doc = this.parseForTab(tab, tab.content);
+        const label = JsonFormats.LABELS[doc.format];
+        if (doc.error) {
+            const problem = await this.findProblem(tab.content, doc.format);
+            const where = problem && problem.line ? ` (line ${problem.line}, column ${problem.column})` : '';
+            alert(`\u2717 Invalid ${label}: ${problem ? problem.message : doc.error.message}${where}`);
+            return;
         }
+        const unreadable = doc.invalid ? doc.invalid.length : 0;
+        alert(unreadable
+            ? `\u2713 Valid ${label}, except ${unreadable.toLocaleString()} ${unreadable === 1 ? 'line' : 'lines'} that couldn't be read`
+            : `\u2713 Valid ${label}`);
     }
 
     formatCurrentTab() {
@@ -1547,7 +1544,7 @@ class JSONViewer {
         if (!activeTab) return;
         // Apply what's in the editor first, so edits aren't formatted away
         if (activeTab.editing) this.finishEditing(activeTab);
-        if (activeTab.editing || !activeTab.jsonData) return;
+        if (activeTab.editing || !activeTab.jsonData || !this.canReformat(activeTab)) return;
 
         const formatted = JSON.stringify(activeTab.jsonData, null, 2);
         // The generated text is LF-only; keep saving with the file's own line endings
@@ -1561,7 +1558,7 @@ class JSONViewer {
         const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
         if (!activeTab) return;
         if (activeTab.editing) this.finishEditing(activeTab);
-        if (activeTab.editing || !activeTab.jsonData) return;
+        if (activeTab.editing || !activeTab.jsonData || !this.canReformat(activeTab)) return;
 
         const minified = JSON.stringify(activeTab.jsonData);
         const lineEnding = activeTab.lineEnding;
@@ -1572,6 +1569,79 @@ class JSONViewer {
 
     getActiveTab() {
         return this.tabs.find(tab => tab.id === this.activeTabId);
+    }
+
+    applyDocument(tab, doc) {
+        tab.format = doc.format;
+        tab.formatInfo = { records: doc.records, invalid: doc.invalid || [], nonFinite: doc.nonFinite || 0 };
+        if (doc.error) {
+            tab.jsonData = null;
+            tab.isValid = false;
+            tab.error = doc.error.message;
+            tab.editing = true;
+        } else {
+            tab.jsonData = doc.data;
+            tab.isValid = true;
+            tab.error = null;
+            tab.editing = false;
+        }
+    }
+
+    // Re-reads text in the tab's format. Plain JSON is detected again, so
+    // adding comments to a .json file makes it JSON with comments.
+    parseForTab(tab, text) {
+        const name = tab.format && tab.format !== 'json' ? `document.${tab.format}` : tab.baseTitle;
+        return JsonFormats.parseDocument(text, name);
+    }
+
+    findProblem(text, format) {
+        const checkJson = window.nativeAPI && window.nativeAPI.checkJson;
+        return JsonFormats.findProblem(text, format || 'json', checkJson);
+    }
+
+    // Format and Minify work on one JSON document, so they can't keep
+    // JSON Lines' one-record-per-line shape or JSONC/JSON5 comments
+    canReformat(tab) {
+        if (tab.format === 'jsonl') {
+            alert('JSON Lines files keep one record per line, so they can\'t be formatted or minified as a single document.');
+            return false;
+        }
+        if (tab.formatInfo && tab.formatInfo.nonFinite) {
+            alert('This JSON5 document contains NaN or Infinity, which plain JSON can\'t represent, so it can\'t be formatted or minified without changing those values.');
+            return false;
+        }
+        if (tab.format === 'jsonc' || tab.format === 'json5') {
+            return confirm(`This turns the ${JsonFormats.LABELS[tab.format]} document into plain JSON, which removes its comments. Continue?`);
+        }
+        return true;
+    }
+
+    createFormatBanner(tab) {
+        const banner = document.createElement('div');
+        banner.className = 'format-banner';
+        const label = JsonFormats.LABELS[tab.format];
+        let text;
+        if (tab.format === 'jsonl') {
+            const records = tab.formatInfo.records || 0;
+            text = `${label}: ${records.toLocaleString()} ${records === 1 ? 'record' : 'records'}, each labeled with its line in the file.`;
+            const invalid = tab.formatInfo.invalid;
+            if (invalid.length) {
+                const lines = invalid.slice(0, 5).map(item => item.line.toLocaleString()).join(', ') + (invalid.length > 5 ? ', ...' : '');
+                const one = invalid.length === 1;
+                text += ` ${invalid.length.toLocaleString()} ${one ? 'line' : 'lines'} couldn't be read and ${one ? 'is' : 'are'} shown as text ` +
+                    `(${one ? 'line' : 'lines'} ${lines}). Use Edit JSON to fix ${one ? 'it' : 'them'}.`;
+                banner.classList.add('warning');
+            }
+        } else if (tab.format === 'jsonc') {
+            text = `${label}: the tree shows the data only. Use Edit JSON to see or change the comments.`;
+        } else {
+            text = `${label}: the tree shows the data as plain JSON. Use Edit JSON to see the original.`;
+            if (tab.formatInfo.nonFinite) {
+                text += ' NaN and Infinity values are shown in quotes, since plain JSON has no way to write them.';
+            }
+        }
+        banner.textContent = text;
+        return banner;
     }
 
     setTabTitle(tab) {
@@ -1600,14 +1670,9 @@ class JSONViewer {
 
     // Leaves the editor once the text is valid and shows it as a tree again
     finishEditing(tab) {
-        try {
-            tab.jsonData = JSON.parse(tab.content);
-        } catch (error) {
-            return;
-        }
-        tab.isValid = true;
-        tab.error = null;
-        tab.editing = false;
+        const doc = this.parseForTab(tab, tab.content);
+        if (doc.error) return;
+        this.applyDocument(tab, doc);
         this.setTabTitle(tab);
         this.updateTabsUI();
         this.updateContentUI();
@@ -1669,25 +1734,13 @@ class JSONViewer {
 
         const text = tab.content || '';
         const total = countLines(text);
-        let problem = null;
-        try {
-            JSON.parse(text);
-        } catch (error) {
-            problem = { message: error.message };
-            if (window.nativeAPI && window.nativeAPI.checkJson) {
-                try {
-                    problem = (await window.nativeAPI.checkJson(text)) || problem;
-                } catch (e) {
-                    // Keep the web engine's message
-                }
-            }
-        }
+        const problem = await this.findProblem(text, tab.format);
         if (problem) {
             const where = problem.line ? ` (line ${problem.line}, column ${problem.column})` : '';
             status.textContent = `\u2717 ${problem.message}${where}`;
             status.className = 'editor-status invalid';
         } else {
-            status.textContent = '\u2713 Valid JSON';
+            status.textContent = `\u2713 Valid ${JsonFormats.LABELS[tab.format || 'json']}`;
             status.className = 'editor-status valid';
         }
 
@@ -1813,25 +1866,24 @@ class JSONViewer {
         };
         const check = async () => {
             const text = textarea.value;
-            let found = null;
-            try {
-                JSON.parse(text);
-            } catch (error) {
-                found = { message: error.message };
-                // The web engines' messages rarely say where; Rust's parser does
-                if (window.nativeAPI && window.nativeAPI.checkJson) {
-                    try {
-                        found = (await window.nativeAPI.checkJson(text)) || found;
-                    } catch (e) {
-                        // Keep the web engine's message
-                    }
+            const format = tab.format || 'json';
+            let found = await this.findProblem(text, format);
+            let label = JsonFormats.LABELS[format];
+            // Plain JSON that turns out to be JSON with comments, JSON5 or JSON Lines is fine
+            if (found && format === 'json') {
+                const doc = JsonFormats.parseDocument(text, tab.baseTitle);
+                if (!doc.error) {
+                    found = null;
+                    label = JsonFormats.LABELS[doc.format];
                 }
             }
             if (textarea.value !== text) return; // still typing; a newer check is queued
             problem = found;
-            // Keep the tab's "(Invalid)" label in step with the text
-            if (tab.isValid !== !problem) {
-                tab.isValid = !problem;
+            // Keep the tab's "(Invalid)" label in step with the text; JSON Lines
+            // with unreadable lines still opens, so it isn't invalid
+            const valid = !problem || format === 'jsonl';
+            if (tab.isValid !== valid) {
+                tab.isValid = valid;
                 this.setTabTitle(tab);
                 this.updateTabsUI();
             }
@@ -1840,12 +1892,13 @@ class JSONViewer {
                 status.textContent = `\u2717 ${problem.message}${where}`;
                 status.className = 'editor-status invalid';
             } else {
-                status.textContent = '\u2713 Valid JSON';
+                status.textContent = `\u2713 Valid ${label}`;
                 status.className = 'editor-status valid';
             }
             gotoBtn.hidden = !(problem && problem.line);
             band.hidden = !(problem && problem.line);
-            viewBtn.disabled = Boolean(problem);
+            // JSON Lines can still be viewed with unreadable lines; they're shown as text
+            viewBtn.disabled = Boolean(problem) && format !== 'jsonl';
             syncScroll();
         };
 
