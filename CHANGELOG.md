@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-28
+
 ### Added
 - 📜 **JSON Lines** - Opens `.jsonl` and `.ndjson` files (one JSON record per line). Each record is labeled with its line in the file, and lines that can't be read are flagged individually and shown as text, so one bad line doesn't hide the rest
-- 💬 **JSON with comments and JSON5** - Opens `.jsonc` and `.json5` files, and `.json` files that contain comments or trailing commas (like `tsconfig.json` or VS Code settings). The editor points at problems in these formats too, and saving keeps comments. Format and Minify ask first, since they turn the document into plain JSON
+- 💬 **JSON with comments and JSON5** - Opens `.jsonc` and `.json5` files, and `.json` files that contain comments or trailing commas (like `tsconfig.json` or VS Code settings). The editor points at problems in these formats too, and saving keeps comments. Format and Minify ask first, since they turn the document into plain JSON. JSON5's `NaN` and `Infinity` are shown in quotes, since plain JSON can't write them
 - 🪟 **More file types** - The installer, the Open and Save dialogs and **Make JSONinja the Default for JSON Files...** now cover `.jsonl`, `.ndjson`, `.jsonc` and `.json5`
 
 ## [2.3.0] - 2026-09-28
