@@ -171,6 +171,21 @@ h1 {
 .shot img { border-radius: 8px; box-shadow: 0 0 0 1px var(--rule), 0 24px 48px -24px rgba(20, 22, 26, .45); }
 .shot figcaption { margin-top: 12px; color: var(--ink-2); font-size: .9375rem; }
 
+/* ---------- Search within keys ---------- */
+.keysearch { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px 56px; align-items: center; }
+@media (max-width: 860px) { .keysearch { grid-template-columns: 1fr; } }
+.keysearch ol { margin: 0; padding-left: 1.3em; color: var(--ink-2); }
+.keysearch li { margin-bottom: 8px; }
+.keysearch li strong { color: var(--ink); }
+.demo-search { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px; background: #252526; border-bottom: 1px solid #3E3E42; font: 400 .8125rem var(--mono); font-variation-settings: "wdth" 87.5; }
+.demo-field { padding: 3px 10px; border: 1px solid #3E3E42; border-radius: 4px; background: #2D2D30; color: #D4D4D4; }
+.demo-field span { color: #858585; }
+.demo-lines { padding: 12px 16px 16px; white-space: pre; overflow-x: auto; }
+.demo-lines .hit { background: #FFC83D; color: #1E1E1E; border-radius: 2px; }
+.demo-lines .note { color: #6A9955; }
+.demo-lines .demo-skip { opacity: .5; }
+.keysearch .lede { margin-bottom: 24px; }
+
 /* ---------- Content sections ---------- */
 .block { padding: 72px 0; border-top: 1px solid var(--rule); }
 .shot + .block { border-top: 0; }
@@ -248,7 +263,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 <div class="wrap intro">
 <div>
 <h1>JSON you can actually read.</h1>
-<p class="sub">JSONinja is a small, free viewer for JSON files. Open one and it's formatted, colored and foldable, however big it is. For Windows, macOS and Linux.</p>
+<p class="sub">JSONinja is a small, free viewer for JSON, JSON Lines, JSONC and JSON5 files. Open one and it's formatted, colored and foldable, however big it is. For Windows, macOS and Linux.</p>
 </div>
 <div class="get">
 <a class="btn" id="dl" href="https://github.com/KrunchMuffin/JSONinja/releases/latest">
@@ -286,6 +301,28 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 <figcaption>The dark theme, with line numbers, fold arrows and rainbow brackets.</figcaption>
 </figure>
 </div>
+
+<section class="block" id="search-keys" aria-labelledby="search-keys-h">
+<div class="wrap keysearch">
+<div>
+<h2 id="search-keys-h">Search inside the keys you care about</h2>
+<p class="lede">Looking for a customer, an error code or an ID? Limit the search to the keys that hold it, and skip every other place the same text turns up.</p>
+<ol>
+<li>Press <kbd>Ctrl</kbd><span class="plus">+</span><kbd>F</kbd> and choose <strong>Values</strong>.</li>
+<li>In <strong>in keys</strong>, list the keys to search: <code>name, email</code></li>
+<li>Type what you're looking for. Matches anywhere else are ignored.</li>
+</ol>
+<p class="fine">Key names match exactly, ignoring case. Items in an array count under the array's key, and in JSON Lines files the search covers every record.</p>
+</div>
+<div class="viewer" aria-label="Example: searching for okafor in the name and email keys">
+<div class="demo-search"><span class="demo-field">okafor</span><span class="demo-field"><span>in keys:</span> name, email</span></div>
+<div class="demo-lines"><span class="k">"name"</span>: <span class="s">"Maya <span class="hit">Okafor</span>"</span>,
+<span class="k">"email"</span>: <span class="s">"maya.<span class="hit">okafor</span>@example.com"</span>,
+<span class="demo-skip"><span class="k">"notes"</span>: <span class="s">"Call Okafor first"</span></span>  <span class="note">// skipped: not in the list</span>
+<span class="demo-skip"><span class="k">"tags"</span>: [<span class="s">"okafor-vip"</span>]</span>       <span class="note">// skipped</span></div>
+</div>
+</div>
+</section>
 
 <section class="block" id="features" aria-labelledby="features-h">
 <div class="wrap">

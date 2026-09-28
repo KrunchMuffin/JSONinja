@@ -1,6 +1,8 @@
 # JSONinja - Advanced JSON Viewer
 
-A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10 MB. Navigate large JSON structures with ease using array indices, string length indicators, full-screen mode, and advanced customization options.
+A fast, lightweight viewer for **JSON, JSON Lines, JSONC and JSON5**, built with Tauri. Installers are about 2-5 MB. Open huge files, search for values within the keys you care about, and fix broken files in place.
+
+Website: [jsoninja.dabworx.com](https://jsoninja.dabworx.com)
 
 ## Features
 
@@ -34,7 +36,7 @@ A powerful, feature-rich JSON viewer built with Tauri. Installers are about 1-10
 
 ### 🔍 Advanced Search
 - **Multi-mode Search** - Search keys, values, or both
-- **Search Within Keys** - Limit a value search to certain keys, e.g. find "okafor" only in `name` and `email` fields
+- **Search Within Keys** - Limit a value search to certain keys, e.g. find "okafor" only in `name` and `email` fields. See [Searching Within Keys](#searching-within-keys)
 - **Real-time Highlighting** - Instant visual feedback
 - **Navigation Controls** - Previous/next result navigation with keyboard shortcuts
 - **Match Counter** - See total matches and current position
@@ -125,9 +127,20 @@ Releases are built by GitHub Actions when a `v*.*.*` tag is pushed. The workflow
 3. **Multi-tab** - Use Ctrl+T to open new tabs for multiple files
 4. **Navigate** - Use the tree view to explore JSON structure
 
+### Supported Formats
+
+| Format | Extensions | How it's shown |
+|---|---|---|
+| JSON | `.json` | A collapsible tree |
+| JSON Lines | `.jsonl`, `.ndjson` | One entry per record, labeled with its line in the file (`"line 12": {...}`). Lines that can't be read are listed in a banner and shown as text, so one bad line doesn't hide the rest |
+| JSON with comments | `.jsonc`, and `.json` files with comments or trailing commas (`tsconfig.json`, VS Code settings) | The data as a tree. Edit JSON shows the comments, and saving keeps them |
+| JSON5 | `.json5` | The data as a tree. `NaN` and `Infinity` are shown in quotes, since plain JSON has no way to write them |
+
+A `.json` file (or pasted text) that isn't plain JSON is tried as JSON Lines, JSON with comments and JSON5 before it's reported as invalid.
+
 ### Loading JSON Data
 - **From File**: Click "Load JSON File" or use Ctrl+O
-- **Right-Click**: Right-click any .json file and select "Open with JSONinja"
+- **Right-Click**: Right-click any JSON, JSON Lines, JSONC or JSON5 file and select "Open with JSONinja"
 - **Recent Files**: Quick access to your last 10 opened files via menu
 - **Paste**: Click "Paste JSON" and paste your content
 - **Drag & Drop**: Drag JSON files directly onto the application
@@ -141,10 +154,34 @@ Releases are built by GitHub Actions when a `v*.*.*` tag is pushed. The workflow
 
 ### Search Functionality
 1. **Open Search** - Press Ctrl+F or click the search icon
-2. **Choose Mode** - Select Keys, Values, or Both
-   - With **Values**, type key names in the **in keys** box (comma-separated, e.g. `name, email`) to only match values under those keys. Array items count under the array's key
+2. **Choose Mode** - Select Keys, Values, or Both. With **Values**, you can also [search within keys](#searching-within-keys)
 3. **Navigate Results** - Use arrow buttons or Enter/Shift+Enter
 4. **Visual Feedback** - Matches are highlighted in yellow, current match in orange
+
+### Searching Within Keys
+
+Find a value only where it appears under certain keys, anywhere in the file:
+
+1. Press **Ctrl+F** and select **Values**. An **in keys** box appears next to the search box.
+2. In **in keys**, type the key names to search, separated by commas: `name, email`
+3. Type what you're looking for in the search box: `okafor`
+
+```json
+"name": "Maya Okafor",               <- found
+"email": "maya.okafor@example.com",  <- found
+"notes": "Call Okafor first"         <- skipped: "notes" isn't listed
+```
+
+- Key names match exactly, ignoring case: `name` finds `name` and `Name`, not `username`
+- The search text matches anywhere in the value, ignoring case
+- Array items count under the array's key: `in keys: tags` searches every item in `"tags": [...]`
+- In JSON Lines files it works across every record, e.g. `in keys: level` with `error` finds every error in a log
+- Leave **in keys** empty to search all values
+
+### Fixing and Editing Files
+- **Broken files** open as text instead of just an error. The bar at the top says what's wrong and where (e.g. *expected `,` or `}` (line 5, column 3)*), that line is highlighted, and **Go to error** jumps to it. It re-checks as you type, and **View formatted** shows the tree once it's valid
+- **Edit JSON** in the sidebar edits any document, and **Ctrl+S** saves it. Saving only writes to files you opened (or picked with Save As), keeps the file's line endings and its read/write permission settings (not its owner or access-control lists, which can be reset by the save), and asks before you close a tab with unsaved changes
+- **Very large files** (over 20,000 lines or 2 MB) are too big to edit in JSONinja; if one is broken, it shows the lines around the problem so you can fix it in a text editor
 
 ### View Controls
 - **Expand/Collapse** - Click arrows next to objects/arrays (state preserved when toggling settings)
@@ -157,7 +194,6 @@ Releases are built by GitHub Actions when a `v*.*.*` tag is pushed. The workflow
 - **Rainbow Brackets** - Color-coded bracket nesting with 8-color cycle
 - **Full Screen** - F11 for distraction-free viewing
 - **Line Numbers** - Toggle in quick settings
-- **Word Wrap** - Enable for long lines
 
 ## File Structure
 
@@ -267,5 +303,6 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
 
 Built with ❤️ using:
 - Tauri - Small, secure cross-platform desktop apps
+- [json5](https://github.com/json5/json5) - JSON5 parsing (MIT License, bundled in `src/vendor/`)
 - Modern CSS - Custom properties and grid
 - Vanilla JavaScript - No frameworks needed
