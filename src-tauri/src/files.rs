@@ -94,6 +94,89 @@ pub fn read_with_encoding(path: &Path, encoding: &str) -> Result<OpenedFile, Str
     Ok(opened_file(path, content, encoding, false, false))
 }
 
+/// Where and why a document fails to parse, for the editor.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsonProblem {
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
+    /// Position in the text in UTF-16 code units, which is how JavaScript counts
+    pub offset: usize,
+}
+
+/// serde_json reports exact positions on every platform, unlike the error
+/// messages from the web engines' JSON.parse. Returns None for valid JSON.
+pub fn json_problem(text: &str) -> Option<JsonProblem> {
+    let err = serde_json::from_str::<serde::de::IgnoredAny>(text).err()?;
+    let full = err.to_string();
+    let message = match full.rfind(" at line ") {
+        Some(end) => full[..end].to_string(),
+        None => full,
+    };
+
+    // serde_json counts columns in bytes; convert to characters for the editor
+    let line = err.line().max(1);
+    let line_start: usize = text
+        .split_inclusive('\n')
+        .take(line - 1)
+        .map(str::len)
+        .sum();
+    let mut byte_offset = (line_start + err.column().saturating_sub(1)).min(text.len());
+    while !text.is_char_boundary(byte_offset) {
+        byte_offset -= 1;
+    }
+    Some(JsonProblem {
+        message,
+        line,
+        column: text[line_start..byte_offset].encode_utf16().count() + 1,
+        offset: text[..byte_offset].encode_utf16().count(),
+    })
+}
+
+/// Writes next to the file first and then swaps it in, so a failed save
+/// never leaves a half-written file behind.
+pub fn write_atomic(path: &Path, content: &str) -> Result<(), String> {
+    let file_name = path
+        .file_name()
+        .ok_or("Not a file path")?
+        .to_string_lossy()
+        .into_owned();
+    let temp = path.with_file_name(format!(".{file_name}.jsoninja-save"));
+    let original = fs::metadata(path).ok();
+
+    write_private(&temp, content).map_err(|e| e.to_string())?;
+    // The swapped-in file keeps the original's permissions, so saving a
+    // private file (say, mode 0600) never makes it readable by others
+    if let Some(original) = original {
+        if let Err(e) = fs::set_permissions(&temp, original.permissions()) {
+            let _ = fs::remove_file(&temp);
+            return Err(e.to_string());
+        }
+    }
+    fs::rename(&temp, path).map_err(|e| {
+        let _ = fs::remove_file(&temp);
+        e.to_string()
+    })
+}
+
+/// Creates the file readable only by the current user until its final
+/// permissions are set.
+fn write_private(path: &Path, content: &str) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    file.write_all(content.as_bytes())?;
+    file.sync_all()
+}
+
 /// Same folder the Electron builds used, so settings and recent files carry over.
 pub fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -150,4 +233,71 @@ pub fn add_recent(app: &AppHandle, path: &Path) -> Result<(), String> {
 
     let text = serde_json::to_string_pretty(&recent).map_err(|e| e.to_string())?;
     fs::write(data_dir(app)?.join("recent-files.json"), text).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_json_has_no_problem() {
+        assert!(json_problem(r#"{"a": [1, 2], "b": null}"#).is_none());
+    }
+
+    #[test]
+    fn missing_comma_points_at_the_next_key() {
+        let text = "{\n  \"a\": [1]\n  \"b\": 2\n}";
+        let problem = json_problem(text).unwrap();
+        assert_eq!((problem.line, problem.column), (3, 3));
+        assert_eq!(&text[problem.offset..problem.offset + 3], "\"b\"");
+        assert_eq!(problem.message, "expected `,` or `}`");
+    }
+
+    #[test]
+    fn positions_count_characters_not_bytes() {
+        // The curly apostrophe is three bytes in UTF-8 but one character in the editor
+        let text = "{\"overview\": \"Canada\u{2019}s largest\" \"x\": 1}";
+        let problem = json_problem(text).unwrap();
+        let error_at = text.find("\"x\"").unwrap();
+        assert_eq!(problem.offset, text[..error_at].encode_utf16().count());
+        assert_eq!(problem.column, problem.offset + 1);
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("jsoninja-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn saving_replaces_the_file_and_leaves_no_temp_file() {
+        let dir = temp_dir("save");
+        let path = dir.join("data.json");
+        fs::write(&path, "old").unwrap();
+        write_atomic(&path, "{\"new\": true}").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"new\": true}");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saving_keeps_restrictive_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = temp_dir("perms");
+        let path = dir.join("secret.json");
+        fs::write(&path, "{}").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        write_atomic(&path, "{\"token\": \"x\"}").unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn non_json_is_reported_at_the_start() {
+        let problem = json_problem("PUT _ingest/pipeline/x\n{}").unwrap();
+        assert_eq!((problem.line, problem.column, problem.offset), (1, 1, 0));
+    }
 }

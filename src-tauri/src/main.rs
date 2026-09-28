@@ -11,13 +11,15 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use serde::Serialize;
 use serde_json::Value;
 use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, DragDropEvent, Emitter, Manager, State, WindowEvent, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Menu items whose ids double as the event names renderer.js listens for.
-const RENDERER_ACTIONS: [&str; 6] = [
+const RENDERER_ACTIONS: [&str; 7] = [
+    "save",
     "new-tab",
     "close-tab",
     "toggle-settings",
@@ -232,6 +234,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
     let mut file_menu = SubmenuBuilder::new(app, "File")
         .item(&item("open", "Open JSON File...", "CmdOrCtrl+O")?)
+        .item(&item("save", "Save", "CmdOrCtrl+S")?)
         .item(&recent_menu.build()?)
         .separator()
         .item(&item("new-tab", "New Tab", "CmdOrCtrl+T")?)
@@ -382,6 +385,68 @@ fn reload_with_encoding(
 }
 
 #[tauri::command]
+fn check_json(text: String) -> Option<files::JsonProblem> {
+    files::json_problem(&text)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedFile {
+    file_path: String,
+    file_name: String,
+}
+
+/// Saves only to files the user opened (or picked with Save As), never to
+/// arbitrary paths the page asks for.
+#[tauri::command]
+fn save_file(state: State<AppState>, file_path: String, content: String) -> Result<(), String> {
+    let path = PathBuf::from(file_path);
+    if !state.0.lock().unwrap().opened.contains(&path) {
+        return Err("Saving is only allowed for files opened in JSONinja".into());
+    }
+    files::write_atomic(&path, &content)
+}
+
+/// Asks where to save, then writes there. Returns None if the user cancels.
+#[tauri::command]
+async fn save_file_as(
+    app: AppHandle,
+    content: String,
+    suggested_name: String,
+) -> Result<Option<SavedFile>, String> {
+    let mut dialog = app
+        .dialog()
+        .file()
+        .add_filter("JSON Files", &["json"])
+        .add_filter("All Files", &["*"])
+        .set_file_name(suggested_name);
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    let Some(path) = dialog.blocking_save_file().and_then(|f| f.into_path().ok()) else {
+        return Ok(None);
+    };
+
+    files::write_atomic(&path, &content)?;
+    app.state::<AppState>()
+        .0
+        .lock()
+        .unwrap()
+        .opened
+        .insert(path.clone());
+    if files::add_recent(&app, &path).is_ok() {
+        refresh_menu(&app);
+    }
+    Ok(Some(SavedFile {
+        file_path: path.to_string_lossy().into_owned(),
+        file_name: path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+    }))
+}
+
+#[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
     updates::install(app).await
 }
@@ -436,6 +501,9 @@ fn main() {
             frontend_ready,
             open_file_dialog,
             reload_with_encoding,
+            check_json,
+            save_file,
+            save_file_as,
             load_settings,
             save_settings,
             install_update,

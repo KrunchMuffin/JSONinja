@@ -42,6 +42,11 @@ jobs:
       - name: Build
         run: npx tauri build --no-bundle
 
+      # The tests don't depend on the platform, so one runner is enough
+      - name: Test
+        if: matrix.platform == 'ubuntu-22.04'
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
       - name: Upload Windows exe
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v7

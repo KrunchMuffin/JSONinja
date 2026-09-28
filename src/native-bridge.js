@@ -42,6 +42,25 @@
             }
         },
         showOpenDialog: () => invoke('open_file_dialog'),
+        // Exact line/column of a parse error, or null if the text is valid JSON
+        checkJson: (text) => invoke('check_json', { text }),
+        saveFile: async ({ filePath, content }) => {
+            try {
+                await invoke('save_file', { filePath, content });
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: String(error) };
+            }
+        },
+        // saved is null if the user cancels the dialog
+        saveFileAs: async ({ content, suggestedName }) => {
+            try {
+                return { success: true, saved: await invoke('save_file_as', { content, suggestedName }) };
+            } catch (error) {
+                return { success: false, error: String(error) };
+            }
+        },
+        onSave: onEvent('save'),
 
         onNewTab: onEvent('new-tab'),
         onCloseTab: onEvent('close-tab'),
