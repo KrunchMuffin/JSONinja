@@ -339,7 +339,7 @@ fn handle_menu(app: &AppHandle, id: &str) {
             app,
             "About JSONinja",
             format!(
-                "JSONinja - Advanced JSON Viewer v{}\n\nA powerful, customizable JSON viewer with multi-tab support.\nBuilt with Tauri.",
+                "JSONinja - Advanced JSON Viewer v{}\n\nA fast viewer for JSON, JSON Lines, JSONC and JSON5.\nBuilt with Tauri.",
                 app.package_info().version
             ),
         ),

@@ -34,7 +34,7 @@
     "active": true,
     "targets": ["nsis", "dmg", "app", "appimage", "deb", "rpm"],
     "category": "DeveloperTool",
-    "shortDescription": "Advanced JSON Viewer",
+    "shortDescription": "Viewer for JSON, JSON Lines, JSONC and JSON5",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

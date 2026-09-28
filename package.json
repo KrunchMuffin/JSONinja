@@ -1,7 +1,7 @@
 {
   "name": "jsoninja",
   "version": "2.4.0",
-  "description": "JSONinja - Advanced JSON Viewer with multi-tab support and extensive customization",
+  "description": "JSONinja - A fast viewer for JSON, JSON Lines, JSONC and JSON5",
   "private": true,
   "scripts": {
     "dev": "tauri dev",
@@ -10,6 +10,10 @@
   },
   "keywords": [
     "json",
+    "jsonl",
+    "ndjson",
+    "jsonc",
+    "json5",
     "viewer",
     "tauri",
     "multi-tab"

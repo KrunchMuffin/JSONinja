@@ -27,6 +27,17 @@ body:
         - Built from source
     validations:
       required: true
+  - type: dropdown
+    id: file-type
+    attributes:
+      label: What kind of file?
+      options:
+        - JSON (.json)
+        - JSON Lines (.jsonl, .ndjson)
+        - JSON with comments (.jsonc)
+        - JSON5 (.json5)
+        - Pasted text
+        - Not specific to a file
   - type: input
     id: os
     attributes:
