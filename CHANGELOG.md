@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 🪟 **Make JSONinja the default for .json** - **File > System Integration > Make JSONinja the Default for .json...** opens Windows Settings at JSONinja's Default apps page, the only place Windows lets you change a default app. JSONinja now shows up by name there
+
+### Changed
+- 🏷️ **File association ID** - `.json` files are registered as `JSONinja.json` instead of the generic `JSON File`, which other apps could also use. The old entry is removed when you update
+
+### Fixed
+- 🪟 **Installer open command** - The command Windows runs to open a `.json` file now puts quotes around JSONinja's path, so it works when the install folder contains a space
+
 ## [2.1.0] - 2026-09-27
 
 ### Added

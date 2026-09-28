@@ -45,7 +45,7 @@
     "fileAssociations": [
       {
         "ext": ["json"],
-        "name": "JSON File",
+        "name": "JSONinja.json",
         "description": "JavaScript Object Notation File",
         "mimeType": "application/json",
         "role": "Editor"
@@ -53,7 +53,8 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerHooks": "./windows/hooks.nsh"
       }
     }
   }
