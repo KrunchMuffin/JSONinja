@@ -30,7 +30,10 @@ npm run build   # build installers into src-tauri/target/release/bundle/
 - `src-tauri/src/main.rs` - Menus, commands, single instance, opening files
 - `src-tauri/src/files.rs` - Encoding detection, settings, recent files
 - `src-tauri/src/registry.rs` - Windows "Open with JSONinja" registration
-- `src-tauri/tauri.conf.json` - Window, Content-Security-Policy, bundling, file associations
+- `src-tauri/src/updates.rs` - Update checks and installs
+- `src-tauri/tauri.conf.json` - Window, Content-Security-Policy, bundling, file associations, updater public key
+- `src-tauri/tauri.release.conf.json` - Release-only settings; release builds sign their update files, which needs the project's private key, so building from source leaves it out
+- `docs/` - The website at [jsoninja.dabworx.com](https://jsoninja.dabworx.com), served by GitHub Pages
 - `src-tauri/capabilities/` - What the page is allowed to call
 
 ### Guidelines
