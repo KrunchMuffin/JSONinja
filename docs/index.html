@@ -429,8 +429,16 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
     return el;
   }
 
-  function lineCount(value) {
-    return JSON.stringify(value, null, 2).split("\n").length;
+  // Lines the value takes when pretty-printed, counted without building anything
+  function countLines(value) {
+    if (value === null || typeof value !== "object") return 1;
+    var n = 2, empty = true;
+    if (Array.isArray(value)) {
+      for (var i = 0; i < value.length; i++) { n += countLines(value[i]); empty = false; }
+    } else {
+      for (var k in value) { if (Object.prototype.hasOwnProperty.call(value, k)) { n += countLines(value[k]); empty = false; } }
+    }
+    return empty ? 1 : n;
   }
 
   function render() {
@@ -484,6 +492,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
     }
 
     function walk(value, key, depth, path, last) {
+      if (shown >= MAX_LINES) return;
       var prefix = key === undefined ? [] : [span("k", JSON.stringify(key)), span("", ": ")];
       var comma = last ? [] : [span("", ",")];
       var isArray = Array.isArray(value);
@@ -491,30 +500,36 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
         line(depth, prefix.concat([scalar(value)], comma));
         return;
       }
-      var entries = isArray ? value.map(function (v, i) { return [undefined, v]; }) : Object.keys(value).map(function (k) { return [k, value[k]]; });
+      var keys = isArray ? null : Object.keys(value);
+      var count = isArray ? value.length : keys.length;
       var open = isArray ? "[" : "{", close = isArray ? "]" : "}";
       var color = "b" + (depth % 8);
       var label = key === undefined ? (depth === 0 ? "root" : "item") : key;
-      if (!entries.length) {
+      if (!count) {
         line(depth, prefix.concat([span(color, open + close)], comma));
         return;
       }
       if (collapsed[path]) {
-        line(depth, prefix.concat([span(color, open), span("more", " " + entries.length + (isArray ? " items " : " keys ")), span(color, close)], comma), path, false, label);
-        lineNo += lineCount(value) - 1;
+        line(depth, prefix.concat([span(color, open), span("more", " " + count + (isArray ? " items " : " keys ")), span(color, close)], comma), path, false, label);
+        lineNo += countLines(value) - 1;
         return;
       }
       line(depth, prefix.concat([span(color, open)]), path, true, label);
-      entries.forEach(function (entry, i) {
-        walk(entry[1], entry[0], depth + 1, path + "/" + (entry[0] === undefined ? i : entry[0]), i === entries.length - 1);
-      });
+      // Stop once the cap is reached; encoded keys keep paths unique even when keys contain "/"
+      for (var i = 0; i < count && shown < MAX_LINES; i++) {
+        var k = isArray ? undefined : keys[i];
+        walk(isArray ? value[i] : value[k], k, depth + 1, path + "/" + encodeURIComponent(isArray ? i : k), i === count - 1);
+      }
       line(depth, [span(color, close)].concat(comma));
     }
 
     walk(data, undefined, 0, "", true);
     out.appendChild(frag);
-    if (lineNo > shown) {
-      out.appendChild(span("error", "Showing the first " + MAX_LINES + " of " + lineNo.toLocaleString() + " lines. The app shows them all."));
+    if (shown >= MAX_LINES) {
+      var total = countLines(data);
+      if (total > shown) {
+        out.appendChild(span("error", "Showing the first " + MAX_LINES + " of " + total.toLocaleString() + " lines. The app shows them all."));
+      }
     }
   }
 
@@ -544,8 +559,12 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
   render();
 
   // ---- Downloads: fill in links and sizes from the latest release ----
-  var ua = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
-  var os = /mac|iphone|ipad/i.test(ua) ? "mac" : /linux|x11|cros/i.test(ua) && !/android/i.test(ua) ? "appimage" : "windows";
+  var uad = navigator.userAgentData;
+  // Phones and tablets can't run it, so they get the downloads table instead of a file
+  var mobile = (uad && uad.mobile) || /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var ua = (uad && uad.platform) || navigator.platform || navigator.userAgent || "";
+  var os = /mac/i.test(ua) ? "mac" : /linux|x11|cros/i.test(ua) ? "appimage" : "windows";
   var names = { windows: "Windows", mac: "macOS", appimage: "Linux" };
   var patterns = {
     windows: /setup.*\.exe$/i,
@@ -555,7 +574,14 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
     deb: /\.deb$/i,
     rpm: /\.rpm$/i
   };
-  document.getElementById("dl-label").textContent = "Download for " + names[os];
+  var dl = document.getElementById("dl");
+  if (mobile) {
+    dl.href = "#downloads";
+    document.getElementById("dl-label").textContent = "See the downloads";
+    document.getElementById("dl-meta").textContent = "For Windows, macOS and Linux";
+  } else {
+    document.getElementById("dl-label").textContent = "Download for " + names[os];
+  }
 
   function mb(bytes) {
     var v = bytes / 1048576;
@@ -580,9 +606,9 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
         row.querySelector("a").href = asset.browser_download_url;
         row.querySelector(".size").textContent = mb(asset.size);
       });
-      var mine = find(os);
+      var mine = !mobile && find(os);
       if (mine) {
-        document.getElementById("dl").href = mine.browser_download_url;
+        dl.href = mine.browser_download_url;
         document.getElementById("dl-meta").textContent = "Version " + String(release.tag_name).replace(/^v/, "") + ", " + mb(mine.size);
       }
     })
