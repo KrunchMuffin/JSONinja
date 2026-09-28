@@ -109,25 +109,57 @@ pub fn register(exe: &Path) -> io::Result<()> {
 pub fn unregister(exe: &Path) -> io::Result<()> {
     let classes = classes()?;
     let exe_name = exe_name(exe);
+    let command = format!("\"{}\" \"%1\"", exe.display());
 
-    // Missing keys and values are fine: they may never have been registered
-    let _ = classes.delete_subkey_all(PROG_ID);
-    let _ = classes.delete_subkey_all(format!(r"Applications\{exe_name}"));
-    let _ = classes.delete_subkey_all(CONTEXT_MENU);
-    if let Ok(progids) = classes.open_subkey_with_flags(r".json\OpenWithProgids", KEY_ALL_ACCESS) {
-        let _ = progids.delete_value(PROG_ID);
+    // The installed copy uses the same names, so only remove what points at
+    // this exe; otherwise an installed JSONinja would disappear from Default
+    // apps. Missing keys and values are fine: they may never have been registered.
+    let app_key = format!(r"Applications\{exe_name}");
+    if points_to(
+        &classes,
+        &format!(r"{app_key}\shell\open\command"),
+        &command,
+    ) {
+        let _ = classes.delete_subkey_all(&app_key);
     }
+    if points_to(&classes, &format!(r"{CONTEXT_MENU}\command"), &command) {
+        let _ = classes.delete_subkey_all(CONTEXT_MENU);
+    }
+    if points_to(
+        &classes,
+        &format!(r"{PROG_ID}\shell\open\command"),
+        &command,
+    ) {
+        let _ = classes.delete_subkey_all(PROG_ID);
+        if let Ok(progids) =
+            classes.open_subkey_with_flags(r".json\OpenWithProgids", KEY_ALL_ACCESS)
+        {
+            let _ = progids.delete_value(PROG_ID);
+        }
 
-    let hkcu = hkcu();
-    let _ = hkcu.delete_subkey_all(r"Software\JSONinja");
-    if let Ok(apps) =
-        hkcu.open_subkey_with_flags(r"Software\RegisteredApplications", KEY_ALL_ACCESS)
-    {
-        let _ = apps.delete_value(REGISTERED_APP);
+        let hkcu = hkcu();
+        let _ = hkcu.delete_subkey_all(r"Software\JSONinja");
+        if let Ok(apps) =
+            hkcu.open_subkey_with_flags(r"Software\RegisteredApplications", KEY_ALL_ACCESS)
+        {
+            let _ = apps.delete_value(REGISTERED_APP);
+        }
     }
 
     remove_legacy(&classes);
     Ok(())
+}
+
+/// Whether the command under `key` runs `command`. A missing key counts as
+/// ours, since there's nothing another copy of JSONinja could lose.
+fn points_to(classes: &RegKey, key: &str, command: &str) -> bool {
+    match classes.open_subkey(key) {
+        Ok(key) => key
+            .get_value::<String, _>("")
+            .map(|current| current.eq_ignore_ascii_case(command))
+            .unwrap_or(true),
+        Err(_) => true,
+    }
 }
 
 /// Older versions registered a different ProgID and pointed .json straight at it
