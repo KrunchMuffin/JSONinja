@@ -1,23 +1,17 @@
 {
   "name": "jsoninja",
-  "version": "1.3.2",
+  "version": "2.0.0",
   "description": "JSONinja - Advanced JSON Viewer with multi-tab support and extensive customization",
-  "main": "main.js",
+  "private": true,
   "scripts": {
-    "start": "electron .",
-    "build": "electron-builder",
-    "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac",
-    "build-linux": "electron-builder --linux",
-    "build-all": "electron-builder --win --mac --linux --publish=never",
-    "release": "electron-builder --publish=always",
-    "dev": "electron . --dev",
-    "postinstall": "electron-builder install-app-deps"
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
   },
   "keywords": [
     "json",
     "viewer",
-    "electron",
+    "tauri",
     "multi-tab"
   ],
   "author": {
@@ -30,11 +24,6 @@
   "bugs": {
     "url": "https://github.com/KrunchMuffin/jsoninja/issues"
   },
-  "support": {
-    "email": "support@dabworx.com",
-    "url": "https://github.com/KrunchMuffin/jsoninja/issues"
-  },
-  "changelog": "https://github.com/KrunchMuffin/jsoninja/blob/main/CHANGELOG.md",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -42,115 +31,6 @@
   },
   "homepage": "https://github.com/KrunchMuffin/jsoninja",
   "devDependencies": {
-    "electron": "^37",
-    "electron-builder": "^26"
-  },
-  "build": {
-    "appId": "com.dabworx.jsoninja",
-    "productName": "JSONinja",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
-    "directories": {
-      "output": "dist"
-    },
-    "icon": "JSONinja",
-    "files": [
-      "main.js",
-      "index.html",
-      "styles.css",
-      "renderer.js",
-      "preload.js",
-      "package.json",
-      "JSONinja.png",
-      "JSONinja.ico"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "${productName}-Setup-v${version}-${arch}.${ext}"
-    },
-    "portable": {
-      "artifactName": "${productName}-Portable-v${version}-${arch}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "perMachine": false
-    },
-    "fileAssociations": [
-      {
-        "ext": "json",
-        "name": "JSON File",
-        "description": "JavaScript Object Notation File",
-        "icon": "JSONinja.ico",
-        "role": "Editor"
-      }
-    ],
-    "mac": {
-      "target": {
-        "target": "dmg",
-        "arch": [
-          "universal"
-        ]
-      },
-      "category": "public.app-category.developer-tools",
-      "artifactName": "${productName}-v${version}.${ext}"
-    },
-    "dmg": {
-      "title": "${productName} v${version}",
-      "contents": [
-        {
-          "x": 410,
-          "y": 150,
-          "type": "link",
-          "path": "/Applications"
-        },
-        {
-          "x": 130,
-          "y": 150,
-          "type": "file"
-        }
-      ]
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "rpm",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "category": "Development",
-      "artifactName": "${productName}-v${version}-${arch}.${ext}"
-    }
-  },
-  "dependencies": {
-    "iconv-lite": "^0.6.3"
+    "@tauri-apps/cli": "^2.12.0"
   }
 }

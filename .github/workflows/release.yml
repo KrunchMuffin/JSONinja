@@ -7,189 +7,103 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v1.0.0)'
+        description: 'Tag to release (e.g., v2.0.0)'
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build-win -- --publish=never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-files
-          path: |
-            dist/*.exe
-            dist/latest.yml
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Clean build directory
-        run: rm -rf dist/
-
-      - run: npm ci
-
-      # Build universal binary (includes both architectures)
-      - run: npm run build-mac -- --publish=never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-files
-          path: |
-            dist/*.dmg
-            dist/*.zip
-            dist/latest-mac.yml
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
-      - run: npm run build-linux -- --publish=never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-files
-          path: |
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
-            dist/latest-linux.yml
-
   create-release:
-    needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      tag: ${{ steps.info.outputs.tag }}
+      release_id: ${{ steps.release.outputs.id }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update README with new version
+      - name: Extract changelog for this version
+        id: info
         run: |
-          VERSION="${{ steps.extract_info.outputs.VERSION }}"
-          VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix for numbers
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          # Everything between this version's heading and the next one
+          awk -v ver="[${TAG#v}]" '
+            /^## \[/ { if (found) exit; if (index($0, ver)) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > release_notes.md
+          [ -s release_notes.md ] || echo "Release ${TAG}" > release_notes.md
 
-          # Update the header
-          sed -i "s/### Latest Release (v[0-9]\+\.[0-9]\+\.[0-9]\+)/### Latest Release (${VERSION})/g" README.md
-
-          # Update download links - use exact patterns from your README
-          sed -i "s/JSONinja-Setup-v[0-9]\+\.[0-9]\+\.[0-9]\+-x64\.exe/JSONinja-Setup-v${VERSION_NUM}-x64.exe/g" README.md
-          sed -i "s/JSONinja-Portable-v[0-9]\+\.[0-9]\+\.[0-9]\+-x64\.exe/JSONinja-Portable-v${VERSION_NUM}-x64.exe/g" README.md
-          sed -i "s/JSONinja-v[0-9]\+\.[0-9]\+\.[0-9]\+\.dmg/JSONinja-v${VERSION_NUM}.dmg/g" README.md
-          sed -i "s/JSONinja-v[0-9]\+\.[0-9]\+\.[0-9]\+-x64\.AppImage/JSONinja-v${VERSION_NUM}-x64.AppImage/g" README.md
-
-      - name: Commit README updates
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add README.md
-          git commit -m "Update README for release ${{ steps.extract_info.outputs.VERSION }}" || exit 0
-          git push
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-files
-
-      - name: Extract version and changelog
-        id: extract_info
-        run: |
-          # Get version from tag
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.tag }}"
-          else
-            VERSION="${{ github.ref_name }}"
-          fi
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-
-          # Extract changelog for this version
-          if [ -f "CHANGELOG.md" ]; then
-            # Extract section between this version and the next header
-            CHANGELOG=$(awk -v ver="${VERSION#v}" '
-              BEGIN { found=0 }
-              /^## \[/ {
-                if ($0 ~ "\\["ver"\\]") {
-                  found=1
-                  next
-                } else if (found) {
-                  exit
-                }
-              }
-              found { print }
-            ' CHANGELOG.md)
-
-            # If no specific version found, get content under Unreleased
-            if [ -z "$CHANGELOG" ]; then
-              CHANGELOG=$(awk '
-                BEGIN { found=0 }
-                /^## \[Unreleased\]/ {
-                  found=1
-                  next
-                }
-                /^## \[/ && found {
-                  exit
-                }
-                found && /^###/ { print }
-                found && /^- / { print }
-              ' CHANGELOG.md)
-            fi
-
-            # Default message if no changelog found
-            if [ -z "$CHANGELOG" ]; then
-              CHANGELOG="Release ${VERSION}"
-            fi
-          else
-            CHANGELOG="Release ${VERSION}"
-          fi
-
-          # Write to file to preserve formatting
-          echo "$CHANGELOG" > release_notes.md
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.extract_info.outputs.VERSION }}
-          name: JSONinja ${{ steps.extract_info.outputs.VERSION }}
-          body_path: release_notes.md
-          draft: true
-          prerelease: false
-          files: |
-            release-files/windows-files/*.exe
-            release-files/macos-files/*.dmg
-            release-files/macos-files/*.zip
-            release-files/linux-files/*.AppImage
-            release-files/linux-files/*.deb
-            release-files/linux-files/*.rpm
-            release-files/windows-files/latest.yml
-            release-files/macos-files/latest-mac.yml
-            release-files/linux-files/latest-linux.yml
+      # Reuses the release if one already exists, so a failed build can be re-run
+      - name: Create draft release
+        id: release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.info.outputs.tag }}
+        run: |
+          find_release() {
+            gh api "repos/${{ github.repository }}/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id"
+          }
+          ID=$(find_release)
+          if [ -z "$ID" ]; then
+            gh release create "$TAG" --draft --title "JSONinja $TAG" --notes-file release_notes.md --target "$GITHUB_SHA"
+            ID=$(find_release)
+          fi
+          echo "id=${ID}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+      # The bare exe runs without installing, so ship it as the portable build
+      - name: Upload Windows portable exe
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PORTABLE="JSONinja-Portable-v${VERSION}-x64.exe"
+          cp src-tauri/target/release/jsoninja.exe "$PORTABLE"
+          gh release upload "${{ needs.create-release.outputs.tag }}" "$PORTABLE" --clobber
