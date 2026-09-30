@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-09-29
+
+### Fixed
+- 🖥️ **Fits smaller screens** - On screens too small for its 1400×900 window (like 1366×768 laptops, or high display scaling), JSONinja now opens at 90% of the screen, centered, instead of running off the edge
+
 ## [2.5.0] - 2026-09-28
 
 ### Fixed

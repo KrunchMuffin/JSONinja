@@ -1,6 +1,6 @@
 {
   "name": "jsoninja",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "JSONinja - A fast viewer for JSON, JSON Lines, JSONC and JSON5",
   "private": true,
   "scripts": {
