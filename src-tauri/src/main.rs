@@ -14,7 +14,10 @@ use std::sync::Mutex;
 use serde::Serialize;
 use serde_json::Value;
 use tauri::menu::{CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
-use tauri::{AppHandle, DragDropEvent, Emitter, Manager, State, WindowEvent, Wry};
+use tauri::{
+    AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, PhysicalSize, State,
+    WebviewWindow, WindowEvent, Wry,
+};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Extensions the open and save dialogs offer: JSON, JSON Lines, JSONC and JSON5
@@ -66,6 +69,37 @@ fn focus_main_window(app: &AppHandle) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+/// The configured size suits a typical desktop. On a smaller screen, shrink the
+/// window to fit and center it, so none of it opens off-screen.
+fn fit_to_screen(window: &WebviewWindow) {
+    let Ok(Some(monitor)) = window.current_monitor() else {
+        return;
+    };
+    let (Ok(inner), Ok(outer)) = (window.inner_size(), window.outer_size()) else {
+        return;
+    };
+    let area = monitor.work_area();
+    let max_width = area.size.width * 9 / 10;
+    let max_height = area.size.height * 9 / 10;
+    if outer.width <= max_width && outer.height <= max_height {
+        return;
+    }
+
+    // set_size sets the inner size, so leave room for the title bar and borders
+    let width = max_width.min(outer.width);
+    let height = max_height.min(outer.height);
+    let frame_width = outer.width.saturating_sub(inner.width);
+    let frame_height = outer.height.saturating_sub(inner.height);
+    let _ = window.set_size(PhysicalSize::new(
+        width.saturating_sub(frame_width),
+        height.saturating_sub(frame_height),
+    ));
+    let _ = window.set_position(PhysicalPosition::new(
+        area.position.x + ((area.size.width - width) / 2) as i32,
+        area.position.y + ((area.size.height - height) / 2) as i32,
+    ));
 }
 
 fn open_paths(app: &AppHandle, paths: Vec<PathBuf>) {
@@ -490,6 +524,9 @@ fn main() {
         .manage(AppState::default())
         .setup(|app| {
             let handle = app.handle();
+            if let Some(window) = app.get_webview_window("main") {
+                fit_to_screen(&window);
+            }
             app.set_menu(build_menu(handle)?)?;
             app.on_menu_event(|app, event| handle_menu(app, event.id().as_ref()));
 
