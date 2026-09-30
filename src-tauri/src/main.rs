@@ -81,15 +81,13 @@ fn fit_to_screen(window: &WebviewWindow) {
         return;
     };
     let area = monitor.work_area();
-    let max_width = area.size.width * 9 / 10;
-    let max_height = area.size.height * 9 / 10;
-    if outer.width <= max_width && outer.height <= max_height {
+    if outer.width <= area.size.width && outer.height <= area.size.height {
         return;
     }
 
     // set_size sets the inner size, so leave room for the title bar and borders
-    let width = max_width.min(outer.width);
-    let height = max_height.min(outer.height);
+    let width = outer.width.min(area.size.width * 9 / 10);
+    let height = outer.height.min(area.size.height * 9 / 10);
     let frame_width = outer.width.saturating_sub(inner.width);
     let frame_height = outer.height.saturating_sub(inner.height);
     let _ = window.set_size(PhysicalSize::new(
