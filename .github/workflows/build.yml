@@ -45,7 +45,9 @@ jobs:
       # The tests don't depend on the platform, so one runner is enough
       - name: Test
         if: matrix.platform == 'ubuntu-22.04'
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml
+          npm test
 
       - name: Upload Windows exe
         if: matrix.platform == 'windows-latest'

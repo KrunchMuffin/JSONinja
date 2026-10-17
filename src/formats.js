@@ -154,6 +154,99 @@
         }
     }
 
+    const isSpace = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r';
+
+    // Rewrites valid JSON text with each value on its own line, indented by
+    // `indent` spaces, or all on one line when indent is 0. Only whitespace
+    // changes: numbers, string escapes, key order and repeated keys stay
+    // exactly as written, which JSON.stringify can't promise.
+    function reindentJson(text, indent) {
+        const out = [];
+        const newline = (depth) => (indent ? '\n' + ' '.repeat(depth * indent) : '');
+        let depth = 0;
+        let i = 0;
+        while (i < text.length) {
+            const c = text[i];
+            if (isSpace(c)) {
+                i++;
+            } else if (c === '"') {
+                let end = i + 1;
+                while (end < text.length && text[end] !== '"') end += text[end] === '\\' ? 2 : 1;
+                out.push(text.slice(i, end + 1));
+                i = end + 1;
+            } else if (c === '{' || c === '[') {
+                let next = i + 1;
+                while (isSpace(text[next])) next++;
+                if (text[next] === '}' || text[next] === ']') {
+                    // Empty, written as {} or [] like JSON.stringify does
+                    out.push(c + text[next]);
+                    i = next + 1;
+                } else {
+                    out.push(c + newline(++depth));
+                    i++;
+                }
+            } else if (c === '}' || c === ']') {
+                out.push(newline(--depth) + c);
+                i++;
+            } else if (c === ',') {
+                out.push(',' + newline(depth));
+                i++;
+            } else if (c === ':') {
+                out.push(indent ? ': ' : ':');
+                i++;
+            } else {
+                // A number, true, false or null, copied as written
+                let end = i + 1;
+                while (end < text.length && !isSpace(text[end]) && !',:]}'.includes(text[end])) end++;
+                out.push(text.slice(i, end));
+                i = end;
+            }
+        }
+        return out.join('');
+    }
+
+    // A valid document as plain JSON, indented by `indent` spaces or on one
+    // line when indent is 0. JSON and JSON with comments are rewritten from
+    // their text, so only whitespace (and comments) change. JSON5 has to be
+    // converted from its parsed value, so check json5NumberChange first.
+    function toPlainJson(text, format, indent) {
+        if (format === 'json5') return JSON.stringify(JSON5.parse(text), null, indent);
+        return reindentJson(format === 'jsonc' ? stripJsonc(text).text : text, indent);
+    }
+
+    // A decimal number as sign, significant digits and exponent, so two
+    // spellings of the same value (1.50, 15e-1) compare equal
+    function canonicalNumber(literal) {
+        const match = /^([+-]?)(\d*)\.?(\d*)(?:[eE]([+-]?\d+))?$/.exec(literal);
+        let digits = (match[2] + match[3]).replace(/^0+/, '');
+        let exponent = Number(match[4] || 0) - match[3].length;
+        if (!digits) return '0';
+        const trailing = digits.length - digits.replace(/0+$/, '').length;
+        digits = digits.slice(0, digits.length - trailing);
+        exponent += trailing;
+        return `${match[1] === '-' ? '-' : ''}${digits}e${exponent}`;
+    }
+
+    // JavaScript numbers keep about 17 significant digits and stop at about
+    // 1.8e308, so longer or larger numbers change when a JSON5 document is
+    // converted to plain JSON. Returns the first such number as
+    // { written, becomes }, or null if every number survives exactly.
+    function json5NumberChange(text) {
+        const tokens = /"(?:[^"\\]|\\[\s\S])*"|'(?:[^'\\]|\\[\s\S])*'|\/\/[^\n]*|\/\*[\s\S]*?\*\/|[A-Za-z_$][\w$]*|[+-]?(?:0[xX][0-9a-fA-F]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
+        for (const [token] of text.matchAll(tokens)) {
+            if (!/^[+-]?[\d.]/.test(token)) continue;
+            const negative = token[0] === '-';
+            const unsigned = token.replace(/^[+-]/, '');
+            const value = (negative ? -1 : 1) * Number(unsigned);
+            const becomes = JSON.stringify(value);
+            const exact = Number.isFinite(value) && (/^0x/i.test(unsigned)
+                ? BigInt(Math.abs(value)) === BigInt(unsigned)
+                : canonicalNumber(token) === canonicalNumber(becomes));
+            if (!exact) return { written: token, becomes };
+        }
+        return null;
+    }
+
     function offsetOf(text, line, column) {
         let offset = 0;
         for (let n = 1; n < line; n++) {
@@ -245,5 +338,5 @@
         return preciseJson(text);
     }
 
-    window.JsonFormats = { LABELS, formatForName, parseDocument, findProblem, stripJsonc };
+    window.JsonFormats = { LABELS, formatForName, parseDocument, findProblem, stripJsonc, toPlainJson, json5NumberChange };
 })();

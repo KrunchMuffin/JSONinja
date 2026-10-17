@@ -320,10 +320,11 @@ class JSONViewer {
                 }
                 
                 // Load the content - this will trigger updateContentUI which will show the warning if needed
-                this.loadJsonFromFile(data.content, data.fileName);
+                if (activeTab) this.loadJsonContent(data.content, data.fileName, activeTab);
                 
             });
 
+            window.nativeAPI.onCloseRequested(() => this.confirmQuit());
             window.nativeAPI.onSave(() => this.saveTab(this.getActiveTab()));
             window.nativeAPI.onNewTab(() => this.createNewTab());
             window.nativeAPI.onCloseTab(() => this.closeCurrentTab());
@@ -454,12 +455,16 @@ class JSONViewer {
         return tabId; // Return the tab ID
     }
 
-    closeTab(tabId) {
-        const index = this.tabs.findIndex(tab => tab.id === tabId);
-        if (index === -1) return;
-        const closing = this.tabs[index];
-        if (closing.dirty && !confirm(`"${closing.baseTitle}" has unsaved changes. Close it anyway?`)) return;
+    // confirm() is asynchronous in the app (see native-bridge.js), so every
+    // question is awaited
+    async closeTab(tabId) {
+        const closing = this.tabs.find(tab => tab.id === tabId);
+        if (!closing) return;
+        if (closing.dirty && !(await confirm(`"${closing.baseTitle}" has unsaved changes. Close it anyway?`))) return;
 
+        // Tabs may have changed while the question was open
+        const index = this.tabs.indexOf(closing);
+        if (index === -1) return;
         this.tabs.splice(index, 1);
 
         if (this.activeTabId === tabId) {
@@ -514,6 +519,14 @@ class JSONViewer {
             });
             tabsContainer.appendChild(tabElement);
         });
+
+        // Every change to a tab's saved state ends up here. The backend uses
+        // this to decide whether closing the window needs to ask first.
+        const unsaved = this.tabs.some(tab => tab.dirty);
+        if (unsaved !== this.reportedUnsaved && window.nativeAPI && window.nativeAPI.setUnsaved) {
+            this.reportedUnsaved = unsaved;
+            window.nativeAPI.setUnsaved(unsaved);
+        }
     }
 
     // Update the updateContentUI method to include word wrap class
@@ -1509,40 +1522,45 @@ class JSONViewer {
         return escaped;
     }
 
-    loadJsonFromFile(content, fileName) {
-        this.loadJsonContent(content, fileName);
-    }
-
-    loadJsonContent(content, title = 'Untitled') {
-        if (!this.activeTabId) {
-            this.createNewTab();
+    // Shows content in the given tab, or the active one. Resolves to false if
+    // the user decides not to open a large file.
+    async loadJsonContent(content, title = 'Untitled', tab = null) {
+        if (!tab) {
+            if (!this.activeTabId) this.createNewTab();
+            tab = this.getActiveTab();
+            if (!tab) return false;
         }
-
-        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
-        if (!activeTab) return;
-
 
         // Check file size
         const sizeInMB = new Blob([content]).size / (1024 * 1024);
         if (sizeInMB > 10) {
-            const proceed = confirm(`This file is ${sizeInMB.toFixed(2)} MB. Large files may take time to process. Continue?`);
-            if (!proceed) return;
+            const proceed = await confirm(`This file is ${sizeInMB.toFixed(2)} MB. Large files may take time to process. Continue?`);
+            if (!proceed) return false;
         }
 
-        activeTab.baseTitle = title;
-        activeTab.dirty = false;
-        activeTab.editorScroll = undefined;
+        tab.baseTitle = title;
+        tab.dirty = false;
+        tab.editorScroll = undefined;
         // Saving writes these back, so a CRLF file stays CRLF
-        activeTab.lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
+        tab.lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
         // JSON, JSON Lines, JSON with comments or JSON5, by file name or content.
         // Invalid documents open as text so they can be fixed.
-        activeTab.content = content;
-        this.applyDocument(activeTab, JsonFormats.parseDocument(content, title));
-        this.setTabTitle(activeTab);
-
+        tab.content = content;
+        this.applyDocument(tab, JsonFormats.parseDocument(content, title));
+        this.setTabTitle(tab);
 
         this.updateTabsUI();
         this.updateContentUI();
+        return true;
+    }
+
+    // Pasted text and files opened without the backend get a tab of their
+    // own, so they never replace another document or save over its file.
+    // An empty Untitled tab is used rather than adding another.
+    async openInNewTab(content, title) {
+        const tab = this.getActiveTab();
+        if (!tab || tab.content != null || tab.filePath) this.createNewTab();
+        return this.loadJsonContent(content, title);
     }
 
     showFileDialog() {
@@ -1559,7 +1577,7 @@ class JSONViewer {
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        this.loadJsonContent(e.target.result, file.name);
+                        this.openInNewTab(e.target.result, file.name);
                     };
                     reader.readAsText(file);
                 }
@@ -1578,11 +1596,12 @@ class JSONViewer {
         document.getElementById('jsonInput').value = '';
     }
 
-    loadJsonFromInput() {
+    async loadJsonFromInput() {
         const content = document.getElementById('jsonInput').value.trim();
         if (content) {
-            this.loadJsonContent(content, 'Pasted JSON');
             this.hidePasteModal();
+            // Pasted JSON exists nowhere else until it's saved, so closing it asks first
+            if (await this.openInNewTab(content, 'Pasted JSON')) this.markDirty(this.getActiveTab());
         }
     }
 
@@ -1605,29 +1624,26 @@ class JSONViewer {
     }
 
     formatCurrentTab() {
-        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
-        if (!activeTab) return;
-        // Apply what's in the editor first, so edits aren't formatted away
-        if (activeTab.editing) this.finishEditing(activeTab);
-        if (activeTab.editing || !activeTab.jsonData || !this.canReformat(activeTab)) return;
-
-        const formatted = JSON.stringify(activeTab.jsonData, null, 2);
-        // The generated text is LF-only; keep saving with the file's own line endings
-        const lineEnding = activeTab.lineEnding;
-        this.loadJsonContent(formatted, activeTab.baseTitle);
-        activeTab.lineEnding = lineEnding;
-        this.markDirty(activeTab);
+        return this.reformatCurrentTab(2);
     }
 
     minifyCurrentTab() {
-        const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
-        if (!activeTab) return;
-        if (activeTab.editing) this.finishEditing(activeTab);
-        if (activeTab.editing || !activeTab.jsonData || !this.canReformat(activeTab)) return;
+        return this.reformatCurrentTab(0);
+    }
 
-        const minified = JSON.stringify(activeTab.jsonData);
+    // Rewrites the document's text rather than the parsed data, so numbers
+    // too long or too large for JavaScript are kept exactly as written
+    async reformatCurrentTab(indent) {
+        const activeTab = this.getActiveTab();
+        if (!activeTab) return;
+        // Apply what's in the editor first, so edits aren't formatted away
+        if (activeTab.editing) this.finishEditing(activeTab);
+        if (activeTab.editing || !activeTab.jsonData || !(await this.canReformat(activeTab))) return;
+
+        const text = JsonFormats.toPlainJson(activeTab.content, activeTab.format, indent);
+        // The generated text is LF-only; keep saving with the file's own line endings
         const lineEnding = activeTab.lineEnding;
-        this.loadJsonContent(minified, activeTab.baseTitle);
+        if (!(await this.loadJsonContent(text, activeTab.baseTitle, activeTab))) return;
         activeTab.lineEnding = lineEnding;
         this.markDirty(activeTab);
     }
@@ -1666,7 +1682,7 @@ class JSONViewer {
 
     // Format and Minify work on one JSON document, so they can't keep
     // JSON Lines' one-record-per-line shape or JSONC/JSON5 comments
-    canReformat(tab) {
+    async canReformat(tab) {
         if (tab.format === 'jsonl') {
             alert('JSON Lines files keep one record per line, so they can\'t be formatted or minified as a single document.');
             return false;
@@ -1675,8 +1691,13 @@ class JSONViewer {
             alert('This JSON5 document contains NaN or Infinity, which plain JSON can\'t represent, so it can\'t be formatted or minified without changing those values.');
             return false;
         }
+        const change = tab.format === 'json5' && JsonFormats.json5NumberChange(tab.content);
+        if (change) {
+            alert(`This JSON5 document contains the number ${change.written}, which would become ${change.becomes} in plain JSON, so it can't be formatted or minified without changing it.`);
+            return false;
+        }
         if (tab.format === 'jsonc' || tab.format === 'json5') {
-            return confirm(`This turns the ${JsonFormats.LABELS[tab.format]} document into plain JSON, which removes its comments. Continue?`);
+            return await confirm(`This turns the ${JsonFormats.LABELS[tab.format]} document into plain JSON, which removes its comments. Continue?`);
         }
         return true;
     }
@@ -1743,9 +1764,10 @@ class JSONViewer {
         this.updateContentUI();
     }
 
+    // Returns true once the tab's text is on disk
     async saveTab(tab) {
-        if (!tab || tab.content == null || !window.nativeAPI || !window.nativeAPI.saveFile) return;
-        if (tab.filePath && !tab.dirty) return;
+        if (!tab || tab.content == null || !window.nativeAPI || !window.nativeAPI.saveFile) return false;
+        if (tab.filePath && !tab.dirty) return true;
 
         const snapshot = tab.content;
         const content = tab.lineEnding === '\r\n' ? snapshot.replace(/\r?\n/g, '\r\n') : snapshot;
@@ -1755,7 +1777,7 @@ class JSONViewer {
         } else {
             const suggestedName = /\.json$/i.test(tab.baseTitle) ? tab.baseTitle : 'untitled.json';
             result = await window.nativeAPI.saveFileAs({ content, suggestedName });
-            if (result.success && !result.saved) return; // cancelled
+            if (result.success && !result.saved) return false; // cancelled
             if (result.success) {
                 tab.filePath = result.saved.filePath;
                 tab.baseTitle = result.saved.fileName;
@@ -1763,7 +1785,7 @@ class JSONViewer {
         }
         if (!result.success) {
             alert(`Couldn't save "${tab.baseTitle}": ${result.error}`);
-            return;
+            return false;
         }
 
         // Saved files are always UTF-8, whatever encoding they were read with.
@@ -1775,6 +1797,31 @@ class JSONViewer {
         this.setTabTitle(tab);
         this.updateTabsUI();
         if (tab.onSaved) tab.onSaved();
+        return true;
+    }
+
+    // The backend only asks when a tab has unsaved changes; otherwise the
+    // window closes straight away
+    async confirmQuit() {
+        if (this.quitting) return;
+        this.quitting = true;
+        try {
+            const unsaved = this.tabs.filter(tab => tab.dirty);
+            if (unsaved.length) {
+                const choice = await window.nativeAPI.confirmClose(unsaved.map(tab => tab.baseTitle));
+                if (choice === 'cancel') return;
+                if (choice === 'save') {
+                    for (const tab of unsaved) {
+                        // Show each one, so a Save As dialog is clearly for it
+                        this.switchToTab(tab.id);
+                        if (!(await this.saveTab(tab))) return;
+                    }
+                }
+            }
+            await window.nativeAPI.quit();
+        } finally {
+            this.quitting = false;
+        }
     }
 
     // A plain-text editor for fixing invalid JSON or editing any document.
@@ -2680,7 +2727,7 @@ class JSONViewer {
         warningDiv.querySelectorAll('.reload-encoding-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const encoding = btn.dataset.encoding;
-                this.reloadWithEncoding(activeTab.filePath, encoding);
+                this.reloadWithEncoding(activeTab, encoding);
                 warningDiv.remove();
             });
         });
@@ -2705,41 +2752,34 @@ class JSONViewer {
         this.updateContentUI();
     }
 
-    async reloadWithEncoding(filePath, encoding) {
+    // Re-reads the tab's file in another encoding. The user may switch tabs
+    // while that runs, so it always updates the tab it was asked for.
+    async reloadWithEncoding(tab, encoding) {
         if (!window.nativeAPI) return;
-        
+
         try {
-            const result = await window.nativeAPI.reloadWithEncoding({ filePath, encoding });
-            if (result.success) {
-                const activeTab = this.tabs.find(tab => tab.id === this.activeTabId);
-                if (activeTab) {
-                    // Store the metadata before loading content
-                    const originalFilePath = activeTab.filePath;
-                    activeTab.encoding = encoding;
-                    activeTab.hasEncodingIssues = false;
-                    activeTab.wasAutoDetected = false; // Manual selection
-                    
-                    // Check if the new encoding has issues (replacement characters)
-                    if (result.content.includes('�')) {
-                        activeTab.hasEncodingIssues = true;
-                    }
-                    
-                    this.loadJsonContent(result.content, result.fileName);
-                    
-                    // Restore the filePath after loading content
-                    activeTab.filePath = originalFilePath;
-                    
-                    // Show appropriate indicator
-                    if (activeTab.hasEncodingIssues) {
-                        // Content will show warning on next render
-                        this.updateContentUI();
-                    } else {
-                        // Show success indicator
-                        this.showEncodingSuccess(encoding);
-                    }
-                }
-            } else {
+            const result = await window.nativeAPI.reloadWithEncoding({ filePath: tab.filePath, encoding });
+            if (!result.success) {
                 alert(`Failed to reload with ${encoding} encoding: ${result.error}`);
+                return;
+            }
+            // The tab may have been closed or edited in the meantime
+            if (!this.tabs.includes(tab)) return;
+            if (tab.dirty && !(await confirm(`Reloading "${tab.baseTitle}" discards its unsaved changes. Reload anyway?`))) return;
+
+            // Set before loading, so the first render shows the right banner
+            const previous = { encoding: tab.encoding, hasEncodingIssues: tab.hasEncodingIssues, wasAutoDetected: tab.wasAutoDetected };
+            tab.encoding = encoding;
+            tab.wasAutoDetected = false; // Manual selection
+            // Replacement characters mean this encoding doesn't fit either
+            tab.hasEncodingIssues = result.content.includes('�');
+            if (!(await this.loadJsonContent(result.content, result.fileName, tab))) {
+                Object.assign(tab, previous);
+                return;
+            }
+
+            if (tab.id === this.activeTabId && !tab.hasEncodingIssues) {
+                this.showEncodingSuccess(encoding);
             }
         } catch (error) {
             alert(`Error reloading file: ${error.message}`);
@@ -2765,7 +2805,7 @@ class JSONViewer {
         successDiv.querySelectorAll('.reload-encoding-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const newEncoding = btn.dataset.encoding;
-                this.reloadWithEncoding(activeTab.filePath, newEncoding);
+                this.reloadWithEncoding(activeTab, newEncoding);
                 successDiv.remove();
             });
         });
