@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-10-16
+
 ### Fixed
 - 💬 **Questions and messages show up again** - Every `confirm` and message box in the app was silently skipped: the dialog plugin replaces the page's own, and its versions show nothing. Closing a tab with unsaved edits closed it without asking, Format and Minify removed comments without asking, and messages like **Validate**'s result or a failed save never appeared. They're shown as native dialogs now
 - 💾 **Closing asks about unsaved changes** - Closing the window or quitting used to throw away unsaved edits without a word; only closing a single tab asked. Now JSONinja offers to save, discard or cancel first, as does **Install and Restart** for an update, and saving an untitled document shows Save As
-- 🔢 **Format and Minify keep numbers exactly** - They used to rewrite numbers through JavaScript, so `9007199254740993` became `9007199254740992` and `1e400` became `null`, and saving made that permanent. Now only the spacing changes, so numbers, escapes like `é`, key order and repeated keys stay as written. Converting JSON5 to plain JSON keeps its numbers and repeated keys the same way
+- 🔢 **Format and Minify keep numbers exactly** - They used to rewrite numbers through JavaScript, so `9007199254740993` became `9007199254740992` and `1e400` became `null`, and saving made that permanent. Now only the spacing changes, so numbers, escapes like `\u00e9`, key order and repeated keys stay as written. Converting JSON5 to plain JSON keeps its numbers and repeated keys the same way
 - 📋 **Pasting opens a new tab** - Pasting JSON used to replace the current tab, discarding its unsaved edits, and a later Save would write the pasted text over that tab's file. Pasted JSON now gets its own untitled tab, which counts as unsaved until you save it, so closing it asks first
 - 🔤 **Reloading with another encoding stays in its own tab** - Switching tabs while a file was being re-read replaced the other tab's content. The reload now always goes to the file it was for, and asks before discarding unsaved edits
 
