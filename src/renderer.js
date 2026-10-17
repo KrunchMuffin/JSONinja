@@ -360,6 +360,8 @@ class JSONViewer {
                 window.nativeAPI.openReleasesPage();
                 return;
             }
+            // Installing closes JSONinja, so unsaved changes come first
+            if (!(await this.settleUnsaved())) return;
             installBtn.disabled = true;
             text.textContent = `Downloading JSONinja ${update.version}...`;
             const result = await window.nativeAPI.installUpdate();
@@ -1764,7 +1766,7 @@ class JSONViewer {
         this.updateContentUI();
     }
 
-    // Returns true once the tab's text is on disk
+    // Returns true once everything in the tab is on disk
     async saveTab(tab) {
         if (!tab || tab.content == null || !window.nativeAPI || !window.nativeAPI.saveFile) return false;
         if (tab.filePath && !tab.dirty) return true;
@@ -1797,7 +1799,7 @@ class JSONViewer {
         this.setTabTitle(tab);
         this.updateTabsUI();
         if (tab.onSaved) tab.onSaved();
-        return true;
+        return !tab.dirty;
     }
 
     // The backend only asks when a tab has unsaved changes; otherwise the
@@ -1806,22 +1808,27 @@ class JSONViewer {
         if (this.quitting) return;
         this.quitting = true;
         try {
-            const unsaved = this.tabs.filter(tab => tab.dirty);
-            if (unsaved.length) {
-                const choice = await window.nativeAPI.confirmClose(unsaved.map(tab => tab.baseTitle));
-                if (choice === 'cancel') return;
-                if (choice === 'save') {
-                    for (const tab of unsaved) {
-                        // Show each one, so a Save As dialog is clearly for it
-                        this.switchToTab(tab.id);
-                        if (!(await this.saveTab(tab))) return;
-                    }
-                }
-            }
-            await window.nativeAPI.quit();
+            if (await this.settleUnsaved()) await window.nativeAPI.quit();
         } finally {
             this.quitting = false;
         }
+    }
+
+    // Before JSONinja closes, offers to save or discard unsaved changes.
+    // Resolves to true once it's fine to close.
+    async settleUnsaved() {
+        const unsaved = this.tabs.filter(tab => tab.dirty);
+        if (!unsaved.length) return true;
+        const choice = await window.nativeAPI.confirmClose(unsaved.map(tab => tab.baseTitle));
+        if (choice === 'cancel') return false;
+        if (choice === 'save') {
+            for (const tab of unsaved) {
+                // Show each one, so a Save As dialog is clearly for it
+                this.switchToTab(tab.id);
+                if (!(await this.saveTab(tab))) return false;
+            }
+        }
+        return true;
     }
 
     // A plain-text editor for fixing invalid JSON or editing any document.

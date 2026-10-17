@@ -177,6 +177,30 @@ test('closing the window stays open if a Save As is cancelled', async () => {
     assert.ok(!calls.some((call) => call.name === 'quit'));
 });
 
+test('closing the window stays open if a tab is edited while it saves', async () => {
+    let tab;
+    const { viewer, calls } = await viewerWith({
+        confirmClose: async () => 'save',
+        saveFile: async () => {
+            tab.content = '{"typed":"during the save"}';
+            return { success: true };
+        },
+        quit: async () => {}
+    });
+    tab = await openFile(viewer, '/data/a.json', '{}');
+    viewer.markDirty(tab);
+    await viewer.confirmQuit();
+    assert.strictEqual(tab.dirty, true);
+    assert.ok(!calls.some((call) => call.name === 'quit'));
+});
+
+test('installing an update offers to save unsaved changes first', async () => {
+    const { viewer, calls } = await viewerWith({ confirmClose: async () => 'cancel' });
+    viewer.markDirty(await openFile(viewer, '/data/a.json', '{}'));
+    assert.strictEqual(await viewer.settleUnsaved(), false);
+    assert.ok(calls.some((call) => call.name === 'confirmClose'));
+});
+
 test('closing the window can discard unsaved changes', async () => {
     const { viewer, calls } = await viewerWith({ confirmClose: async () => 'discard', quit: async () => {} });
     viewer.markDirty(await openFile(viewer, '/data/a.json', '{}'));

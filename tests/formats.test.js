@@ -42,8 +42,9 @@ test('JSON5 numbers that change as plain JSON are found', () => {
     };
     assert.deepStrictEqual(change('{a: 9007199254740993}'), { written: '9007199254740993', becomes: '9007199254740992' });
     assert.deepStrictEqual(change('[1e400]'), { written: '1e400', becomes: 'null' });
+    assert.deepStrictEqual(change('[-0.0]'), { written: '-0.0', becomes: '0' });
     assert.deepStrictEqual(change('[0x20000000000001]'), { written: '0x20000000000001', becomes: '9007199254740992' });
-    assert.strictEqual(change('{a: .5, b: 5., c: +1, d: -0x1F, e: 1.50e3, f: 1e21, g: 0.1}'), null);
+    assert.strictEqual(change('{a: .5, b: 5., c: +1, d: -0x1F, e: 1.50e3, f: 1e21, g: 0.1, h: 0.0}'), null);
     // Numbers inside strings, comments and names don't count
     assert.strictEqual(change("{'x': '9007199254740993', // 1e400\n key9007199254740993: 1}"), null);
 });

@@ -220,7 +220,8 @@
         const match = /^([+-]?)(\d*)\.?(\d*)(?:[eE]([+-]?\d+))?$/.exec(literal);
         let digits = (match[2] + match[3]).replace(/^0+/, '');
         let exponent = Number(match[4] || 0) - match[3].length;
-        if (!digits) return '0';
+        // JSON5 reads -0 as negative zero, which JSON.stringify writes as 0
+        if (!digits) return match[1] === '-' ? '-0' : '0';
         const trailing = digits.length - digits.replace(/0+$/, '').length;
         digits = digits.slice(0, digits.length - trailing);
         exponent += trailing;
