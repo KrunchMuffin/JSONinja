@@ -13,8 +13,8 @@ Website: [jsoninja.dabworx.com](https://jsoninja.dabworx.com)
 - **Real-time Validation** - Instant JSON syntax validation and error reporting
 - **JSON Lines, JSONC and JSON5** - Opens `.jsonl`/`.ndjson` (one record per line, each labeled with its line, with unreadable lines flagged individually), JSON with comments (`.jsonc`, and `.json` files like `tsconfig.json` that contain comments), and JSON5. Saving keeps the original format, comments included
 - **Fix Broken Files** - Invalid JSON opens as text with the exact line and column of the problem highlighted. Fix it, watch it re-check as you type, and save it back
-- **Edit and Save** - Edit any document with **Edit JSON** and save with `Ctrl/Cmd + S`; the file keeps its original line endings
-- **Format & Minify** - Pretty-print or minify JSON with one click
+- **Edit and Save** - Edit any document with **Edit JSON** and save with `Ctrl/Cmd + S`; the file keeps its original line endings. Closing the window or quitting offers to save unsaved changes first
+- **Format & Minify** - Pretty-print or minify JSON with one click. Only the spacing changes, so long numbers like `9007199254740993` are kept exactly
 - **Search & Navigation** - Powerful search with key/value filtering and highlighting
 - **Tree View** - Collapsible JSON structure with state-preserving expand/collapse controls
 - **Array Index Display** - Shows `[0]`, `[1]`, `[2]` indices for easy array navigation (toggleable)

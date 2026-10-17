@@ -2,11 +2,12 @@
 //! signed, and the updater refuses anything not signed with our key.
 
 use std::fs;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::{files, show_error, show_info};
 
@@ -126,9 +127,16 @@ pub async fn check(app: AppHandle, manual: bool) {
     }
 }
 
-/// Downloads and installs the latest release, then restarts. On Windows the
-/// installer takes over and relaunches the app itself.
-pub async fn install(app: AppHandle) -> Result<(), String> {
+/// A downloaded, signature-checked update waiting to be installed
+#[derive(Default)]
+pub struct Downloaded(Mutex<Option<(Update, Vec<u8>)>>);
+
+/// Downloads the latest release. Installing is separate, so the renderer can
+/// deal with anything edited during the download before JSONinja closes.
+pub async fn download(app: AppHandle) -> Result<(), String> {
+    if app.state::<Downloaded>().0.lock().unwrap().is_some() {
+        return Ok(());
+    }
     let update = app
         .updater()
         .map_err(|e| e.to_string())?
@@ -139,8 +147,8 @@ pub async fn install(app: AppHandle) -> Result<(), String> {
 
     let mut downloaded = 0;
     let progress_app = app.clone();
-    update
-        .download_and_install(
+    let bytes = update
+        .download(
             move |chunk, total| {
                 downloaded += chunk;
                 let _ = progress_app.emit("update-progress", UpdateProgress { downloaded, total });
@@ -149,7 +157,21 @@ pub async fn install(app: AppHandle) -> Result<(), String> {
         )
         .await
         .map_err(|e| e.to_string())?;
+    *app.state::<Downloaded>().0.lock().unwrap() = Some((update, bytes));
+    Ok(())
+}
 
+/// Installs the downloaded update, then restarts. On Windows the installer
+/// takes over and relaunches the app itself.
+pub fn install(app: &AppHandle) -> Result<(), String> {
+    let (update, bytes) = app
+        .state::<Downloaded>()
+        .0
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or("The update hasn't been downloaded")?;
+    update.install(bytes).map_err(|e| e.to_string())?;
     app.restart();
 }
 

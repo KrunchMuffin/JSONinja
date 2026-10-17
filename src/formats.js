@@ -154,6 +154,108 @@
         }
     }
 
+    const isSpace = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r';
+
+    // Rewrites valid JSON text with each value on its own line, indented by
+    // `indent` spaces, or all on one line when indent is 0. Only whitespace
+    // changes: numbers, string escapes, key order and repeated keys stay
+    // exactly as written, which JSON.stringify can't promise.
+    function reindentJson(text, indent) {
+        const out = [];
+        const newline = (depth) => (indent ? '\n' + ' '.repeat(depth * indent) : '');
+        let depth = 0;
+        let i = 0;
+        while (i < text.length) {
+            const c = text[i];
+            if (isSpace(c)) {
+                i++;
+            } else if (c === '"') {
+                let end = i + 1;
+                while (end < text.length && text[end] !== '"') end += text[end] === '\\' ? 2 : 1;
+                out.push(text.slice(i, end + 1));
+                i = end + 1;
+            } else if (c === '{' || c === '[') {
+                let next = i + 1;
+                while (isSpace(text[next])) next++;
+                if (text[next] === '}' || text[next] === ']') {
+                    // Empty, written as {} or [] like JSON.stringify does
+                    out.push(c + text[next]);
+                    i = next + 1;
+                } else {
+                    out.push(c + newline(++depth));
+                    i++;
+                }
+            } else if (c === '}' || c === ']') {
+                out.push(newline(--depth) + c);
+                i++;
+            } else if (c === ',') {
+                out.push(',' + newline(depth));
+                i++;
+            } else if (c === ':') {
+                out.push(indent ? ': ' : ':');
+                i++;
+            } else {
+                // A number, true, false or null, copied as written
+                let end = i + 1;
+                while (end < text.length && !isSpace(text[end]) && !',:]}'.includes(text[end])) end++;
+                out.push(text.slice(i, end));
+                i = end;
+            }
+        }
+        return out.join('');
+    }
+
+    // JSON5's tokens: whitespace (which includes U+2028, U+2029 and the BOM),
+    // comments (// ends at any line terminator), strings, numbers, names and
+    // punctuation
+    const JSON5_TOKEN = /\s+|\/\/[^\n\r\u2028\u2029]*|\/\*[\s\S]*?\*\/|"(?:[^"\\]|\\[\s\S])*"|'(?:[^'\\]|\\[\s\S])*'|[+-]?(?:0[xX][0-9a-fA-F]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|Infinity|NaN)|(?:[$_\p{ID_Start}]|\\u[0-9a-fA-F]{4})(?:[$\u200c\u200d\p{ID_Continue}]|\\u[0-9a-fA-F]{4})*|[{}[\]:,]/uy;
+
+    // A JSON5 number written as JSON with exactly the same value: hex in
+    // decimal, and no leading +, bare decimal point or trailing point
+    function json5Number(token) {
+        const sign = token[0] === '-' ? '-' : '';
+        const unsigned = token.replace(/^[+-]/, '');
+        if (/^0x/i.test(unsigned)) return sign + BigInt(unsigned).toString();
+        if (unsigned === 'Infinity' || unsigned === 'NaN') {
+            throw new SyntaxError(`plain JSON can't write ${token}`);
+        }
+        const [, whole, fraction, exponent = ''] = /^(\d*)(?:\.(\d*))?(.*)$/.exec(unsigned);
+        return sign + (whole || '0') + (fraction ? '.' + fraction : '') + exponent;
+    }
+
+    // Rewrites valid JSON5 as compact JSON from its tokens, so numbers, key
+    // order and repeated keys are kept, which JSON.stringify can't promise.
+    // Comments and trailing commas are dropped; strings and names are
+    // rewritten with JSON's quotes and escapes.
+    function json5ToJson(text) {
+        const tokens = [];
+        JSON5_TOKEN.lastIndex = 0;
+        while (JSON5_TOKEN.lastIndex < text.length) {
+            const match = JSON5_TOKEN.exec(text);
+            if (!match) throw new SyntaxError('not valid JSON5');
+            const token = match[0];
+            if (!/^(\s|\/[/*])/.test(token)) tokens.push(token);
+        }
+        return tokens.map((token, i) => {
+            const next = tokens[i + 1];
+            if (token === ',') return next === '}' || next === ']' ? '' : ',';
+            if ('{}[]:'.includes(token)) return token;
+            if (token[0] === '"' || token[0] === "'") return JSON.stringify(JSON5.parse(token));
+            if (next === ':') return JSON.stringify(JSON.parse(`"${token}"`)); // a name
+            if (token === 'true' || token === 'false' || token === 'null') return token;
+            return json5Number(token);
+        }).join('');
+    }
+
+    // A valid document as plain JSON, indented by `indent` spaces or on one
+    // line when indent is 0. Only spacing, comments and trailing commas
+    // change (and JSON5's own spellings), never a value.
+    function toPlainJson(text, format, indent) {
+        if (format === 'json5') text = json5ToJson(text);
+        else if (format === 'jsonc') text = stripJsonc(text).text;
+        return reindentJson(text, indent);
+    }
+
     function offsetOf(text, line, column) {
         let offset = 0;
         for (let n = 1; n < line; n++) {
@@ -245,5 +347,5 @@
         return preciseJson(text);
     }
 
-    window.JsonFormats = { LABELS, formatForName, parseDocument, findProblem, stripJsonc };
+    window.JsonFormats = { LABELS, formatForName, parseDocument, findProblem, stripJsonc, toPlainJson };
 })();

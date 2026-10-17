@@ -18,7 +18,9 @@ use tauri::{
     AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, PhysicalSize, State,
     WebviewWindow, WindowEvent, Wry,
 };
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_dialog::{
+    DialogExt, MessageDialogBuilder, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
+};
 
 /// Extensions the open and save dialogs offer: JSON, JSON Lines, JSONC and JSON5
 const JSON_EXTENSIONS: [&str; 5] = ["json", "jsonl", "ndjson", "jsonc", "json5"];
@@ -46,6 +48,8 @@ struct Inner {
     opened: HashSet<PathBuf>,
     /// Ctrl+O can arrive from both the menu and the page; only show one dialog
     dialog_open: bool,
+    /// The renderer reports whether any tab has unsaved changes
+    unsaved: bool,
 }
 
 fn show_error(app: &AppHandle, message: String) {
@@ -98,6 +102,17 @@ fn fit_to_screen(window: &WebviewWindow) {
         area.position.x + ((area.size.width - width) / 2) as i32,
         area.position.y + ((area.size.height - height) / 2) as i32,
     ));
+}
+
+/// With unsaved changes, closing the window or quitting asks the renderer
+/// first, which offers to save them and quits itself. Returns true if it's
+/// fine to close now.
+fn can_close(app: &AppHandle) -> bool {
+    if !app.state::<AppState>().0.lock().unwrap().unsaved {
+        return true;
+    }
+    let _ = app.emit("close-requested", ());
+    false
 }
 
 fn open_paths(app: &AppHandle, paths: Vec<PathBuf>) {
@@ -267,6 +282,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         recent_menu = recent_menu.text(format!("recent-{index}"), &file.name);
     }
 
+    // Quit is our own item rather than the predefined one, which would exit
+    // without checking for unsaved changes
     let mut file_menu = SubmenuBuilder::new(app, "File")
         .item(&item("open", "Open JSON File...", "CmdOrCtrl+O")?)
         .item(&item("save", "Save", "CmdOrCtrl+S")?)
@@ -289,7 +306,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         });
     // macOS keeps Quit in the app menu
     if !cfg!(target_os = "macos") {
-        file_menu = file_menu.separator().quit();
+        let quit_text = if cfg!(windows) { "Exit" } else { "Quit" };
+        file_menu = file_menu
+            .separator()
+            .item(&MenuItemBuilder::with_id("quit", quit_text).build(app)?);
     }
 
     let edit_menu = SubmenuBuilder::new(app, "Edit")
@@ -334,7 +354,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             .hide_others()
             .show_all()
             .separator()
-            .quit()
+            .item(&item("quit", "Quit JSONinja", "CmdOrCtrl+Q")?)
             .build()?,
     );
     menu.item(&file_menu.build()?)
@@ -357,6 +377,11 @@ fn handle_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => show_open_dialog(app),
         "fullscreen" => toggle_fullscreen(app),
+        "quit" => {
+            if can_close(app) {
+                app.exit(0);
+            }
+        }
         "make-default" => make_default_app(app),
         #[cfg(windows)]
         "remove-association" => remove_file_association(app),
@@ -422,6 +447,82 @@ fn reload_with_encoding(
 }
 
 #[tauri::command]
+fn set_unsaved(state: State<AppState>, unsaved: bool) {
+    state.0.lock().unwrap().unsaved = unsaved;
+}
+
+/// A dialog in front of the main window, for the page's alert() and confirm()
+fn page_dialog(app: &AppHandle, message: String) -> MessageDialogBuilder<Wry> {
+    let mut dialog = app.dialog().message(message).title("JSONinja");
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.parent(&window);
+    }
+    dialog
+}
+
+/// The page's alert(), which the dialog plugin would otherwise swallow
+#[tauri::command]
+async fn page_alert(app: AppHandle, message: String) {
+    page_dialog(&app, message).blocking_show();
+}
+
+/// The page's confirm(): true for OK
+#[tauri::command]
+async fn page_confirm(app: AppHandle, message: String) -> bool {
+    page_dialog(&app, message)
+        .buttons(MessageDialogButtons::OkCancel)
+        .blocking_show()
+}
+
+/// Asks whether to save the named documents before closing: returns "save",
+/// "discard" or "cancel"
+#[tauri::command]
+async fn confirm_close(app: AppHandle, names: Vec<String>) -> &'static str {
+    let message = match names.as_slice() {
+        [name] => format!("Do you want to save the changes to \"{name}\" before closing?"),
+        _ => format!(
+            "These documents have unsaved changes:
+
+{}
+
+Do you want to save them before closing?",
+            names.join(
+                "
+"
+            )
+        ),
+    };
+    let (save, discard) = ("Save".to_string(), "Don't Save".to_string());
+    let mut dialog = app
+        .dialog()
+        .message(message)
+        .title("Unsaved Changes")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::YesNoCancelCustom(
+            save.clone(),
+            discard.clone(),
+            "Cancel".into(),
+        ));
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.parent(&window);
+    }
+    match dialog.blocking_show_with_result() {
+        MessageDialogResult::Yes => "save",
+        MessageDialogResult::No => "discard",
+        MessageDialogResult::Custom(label) if label == save => "save",
+        MessageDialogResult::Custom(label) if label == discard => "discard",
+        _ => "cancel",
+    }
+}
+
+/// The renderer has saved or discarded its changes
+#[tauri::command]
+fn quit(app: AppHandle) {
+    app.state::<AppState>().0.lock().unwrap().unsaved = false;
+    app.exit(0);
+}
+
+#[tauri::command]
 fn check_json(text: String) -> Option<files::JsonProblem> {
     files::json_problem(&text)
 }
@@ -484,8 +585,13 @@ async fn save_file_as(
 }
 
 #[tauri::command]
+async fn download_update(app: AppHandle) -> Result<(), String> {
+    updates::download(app).await
+}
+
+#[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
-    updates::install(app).await
+    updates::install(&app)
 }
 
 #[tauri::command]
@@ -520,6 +626,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .manage(updates::Downloaded::default())
         .setup(|app| {
             let handle = app.handle();
             if let Some(window) = app.get_webview_window("main") {
@@ -532,20 +639,30 @@ fn main() {
             open_paths(handle, file_args(std::env::args_os().skip(1), &cwd));
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event {
+        .on_window_event(|window, event| match event {
+            WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) => {
                 open_paths(window.app_handle(), paths.clone());
             }
+            WindowEvent::CloseRequested { api, .. } if !can_close(window.app_handle()) => {
+                api.prevent_close();
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             frontend_ready,
             open_file_dialog,
             reload_with_encoding,
+            set_unsaved,
+            confirm_close,
+            page_alert,
+            page_confirm,
+            quit,
             check_json,
             save_file,
             save_file_as,
             load_settings,
             save_settings,
+            download_update,
             install_update,
             dismiss_update,
             open_releases_page

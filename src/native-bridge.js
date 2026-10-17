@@ -8,6 +8,14 @@
 
     const onEvent = (name) => (callback) => listen(name, (event) => callback(event, event.payload));
 
+    // The dialog plugin replaces alert() and confirm() with versions that
+    // show nothing (its confirm calls a command it doesn't have), and
+    // confirm() then returns a promise, which reads as "yes". These show
+    // native dialogs instead. confirm() still resolves asynchronously, so
+    // the renderer awaits it.
+    window.alert = (message) => invoke('page_alert', { message: String(message) });
+    window.confirm = (message) => invoke('page_confirm', { message: String(message) });
+
     window.nativeAPI = {
         getVersion: () => window.__TAURI__.app.getVersion(),
 
@@ -62,6 +70,14 @@
         },
         onSave: onEvent('save'),
 
+        // Closing the window or quitting is held back while a tab has unsaved
+        // changes, and close-requested asks the page what to do
+        setUnsaved: (unsaved) => invoke('set_unsaved', { unsaved }),
+        onCloseRequested: onEvent('close-requested'),
+        // 'save', 'discard' or 'cancel'
+        confirmClose: (names) => invoke('confirm_close', { names }),
+        quit: () => invoke('quit'),
+
         onNewTab: onEvent('new-tab'),
         onCloseTab: onEvent('close-tab'),
         onToggleSettings: onEvent('toggle-settings'),
@@ -71,6 +87,14 @@
 
         onUpdateAvailable: onEvent('update-available'),
         onUpdateProgress: onEvent('update-progress'),
+        downloadUpdate: async () => {
+            try {
+                await invoke('download_update');
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: String(error) };
+            }
+        },
         // Only settles if the install fails; a successful install restarts the app
         installUpdate: async () => {
             try {
