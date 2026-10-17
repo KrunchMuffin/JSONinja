@@ -205,47 +205,55 @@
         return out.join('');
     }
 
-    // A valid document as plain JSON, indented by `indent` spaces or on one
-    // line when indent is 0. JSON and JSON with comments are rewritten from
-    // their text, so only whitespace (and comments) change. JSON5 has to be
-    // converted from its parsed value, so check json5NumberChange first.
-    function toPlainJson(text, format, indent) {
-        if (format === 'json5') return JSON.stringify(JSON5.parse(text), null, indent);
-        return reindentJson(format === 'jsonc' ? stripJsonc(text).text : text, indent);
-    }
+    // JSON5's tokens: whitespace (which includes U+2028, U+2029 and the BOM),
+    // comments (// ends at any line terminator), strings, numbers, names and
+    // punctuation
+    const JSON5_TOKEN = /\s+|\/\/[^\n\r\u2028\u2029]*|\/\*[\s\S]*?\*\/|"(?:[^"\\]|\\[\s\S])*"|'(?:[^'\\]|\\[\s\S])*'|[+-]?(?:0[xX][0-9a-fA-F]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|Infinity|NaN)|(?:[$_\p{ID_Start}]|\\u[0-9a-fA-F]{4})(?:[$\u200c\u200d\p{ID_Continue}]|\\u[0-9a-fA-F]{4})*|[{}[\]:,]/uy;
 
-    // A decimal number as sign, significant digits and exponent, so two
-    // spellings of the same value (1.50, 15e-1) compare equal
-    function canonicalNumber(literal) {
-        const match = /^([+-]?)(\d*)\.?(\d*)(?:[eE]([+-]?\d+))?$/.exec(literal);
-        let digits = (match[2] + match[3]).replace(/^0+/, '');
-        let exponent = Number(match[4] || 0) - match[3].length;
-        // JSON5 reads -0 as negative zero, which JSON.stringify writes as 0
-        if (!digits) return match[1] === '-' ? '-0' : '0';
-        const trailing = digits.length - digits.replace(/0+$/, '').length;
-        digits = digits.slice(0, digits.length - trailing);
-        exponent += trailing;
-        return `${match[1] === '-' ? '-' : ''}${digits}e${exponent}`;
-    }
-
-    // JavaScript numbers keep about 17 significant digits and stop at about
-    // 1.8e308, so longer or larger numbers change when a JSON5 document is
-    // converted to plain JSON. Returns the first such number as
-    // { written, becomes }, or null if every number survives exactly.
-    function json5NumberChange(text) {
-        const tokens = /"(?:[^"\\]|\\[\s\S])*"|'(?:[^'\\]|\\[\s\S])*'|\/\/[^\n]*|\/\*[\s\S]*?\*\/|[A-Za-z_$][\w$]*|[+-]?(?:0[xX][0-9a-fA-F]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/g;
-        for (const [token] of text.matchAll(tokens)) {
-            if (!/^[+-]?[\d.]/.test(token)) continue;
-            const negative = token[0] === '-';
-            const unsigned = token.replace(/^[+-]/, '');
-            const value = (negative ? -1 : 1) * Number(unsigned);
-            const becomes = JSON.stringify(value);
-            const exact = Number.isFinite(value) && (/^0x/i.test(unsigned)
-                ? BigInt(Math.abs(value)) === BigInt(unsigned)
-                : canonicalNumber(token) === canonicalNumber(becomes));
-            if (!exact) return { written: token, becomes };
+    // A JSON5 number written as JSON with exactly the same value: hex in
+    // decimal, and no leading +, bare decimal point or trailing point
+    function json5Number(token) {
+        const sign = token[0] === '-' ? '-' : '';
+        const unsigned = token.replace(/^[+-]/, '');
+        if (/^0x/i.test(unsigned)) return sign + BigInt(unsigned).toString();
+        if (unsigned === 'Infinity' || unsigned === 'NaN') {
+            throw new SyntaxError(`plain JSON can't write ${token}`);
         }
-        return null;
+        const [, whole, fraction, exponent = ''] = /^(\d*)(?:\.(\d*))?(.*)$/.exec(unsigned);
+        return sign + (whole || '0') + (fraction ? '.' + fraction : '') + exponent;
+    }
+
+    // Rewrites valid JSON5 as compact JSON from its tokens, so numbers, key
+    // order and repeated keys are kept, which JSON.stringify can't promise.
+    // Comments and trailing commas are dropped; strings and names are
+    // rewritten with JSON's quotes and escapes.
+    function json5ToJson(text) {
+        const tokens = [];
+        JSON5_TOKEN.lastIndex = 0;
+        while (JSON5_TOKEN.lastIndex < text.length) {
+            const match = JSON5_TOKEN.exec(text);
+            if (!match) throw new SyntaxError('not valid JSON5');
+            const token = match[0];
+            if (!/^(\s|\/[/*])/.test(token)) tokens.push(token);
+        }
+        return tokens.map((token, i) => {
+            const next = tokens[i + 1];
+            if (token === ',') return next === '}' || next === ']' ? '' : ',';
+            if ('{}[]:'.includes(token)) return token;
+            if (token[0] === '"' || token[0] === "'") return JSON.stringify(JSON5.parse(token));
+            if (next === ':') return JSON.stringify(JSON.parse(`"${token}"`)); // a name
+            if (token === 'true' || token === 'false' || token === 'null') return token;
+            return json5Number(token);
+        }).join('');
+    }
+
+    // A valid document as plain JSON, indented by `indent` spaces or on one
+    // line when indent is 0. Only spacing, comments and trailing commas
+    // change (and JSON5's own spellings), never a value.
+    function toPlainJson(text, format, indent) {
+        if (format === 'json5') text = json5ToJson(text);
+        else if (format === 'jsonc') text = stripJsonc(text).text;
+        return reindentJson(text, indent);
     }
 
     function offsetOf(text, line, column) {
@@ -339,5 +347,5 @@
         return preciseJson(text);
     }
 
-    window.JsonFormats = { LABELS, formatForName, parseDocument, findProblem, stripJsonc, toPlainJson, json5NumberChange };
+    window.JsonFormats = { LABELS, formatForName, parseDocument, findProblem, stripJsonc, toPlainJson };
 })();

@@ -87,6 +87,14 @@
 
         onUpdateAvailable: onEvent('update-available'),
         onUpdateProgress: onEvent('update-progress'),
+        downloadUpdate: async () => {
+            try {
+                await invoke('download_update');
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: String(error) };
+            }
+        },
         // Only settles if the install fails; a successful install restarts the app
         installUpdate: async () => {
             try {

@@ -34,21 +34,20 @@ test('JSON with comments loses its comments and trailing commas, nothing else', 
     );
 });
 
-test('JSON5 numbers that change as plain JSON are found', () => {
-    // Copied out of the sandbox, whose objects have their own prototypes
-    const change = (text) => {
-        const found = JsonFormats.json5NumberChange(text);
-        return found && { ...found };
-    };
-    assert.deepStrictEqual(change('{a: 9007199254740993}'), { written: '9007199254740993', becomes: '9007199254740992' });
-    assert.deepStrictEqual(change('[1e400]'), { written: '1e400', becomes: 'null' });
-    assert.deepStrictEqual(change('[-0.0]'), { written: '-0.0', becomes: '0' });
-    assert.deepStrictEqual(change('[0x20000000000001]'), { written: '0x20000000000001', becomes: '9007199254740992' });
-    assert.strictEqual(change('{a: .5, b: 5., c: +1, d: -0x1F, e: 1.50e3, f: 1e21, g: 0.1, h: 0.0}'), null);
-    // Numbers inside strings, comments and names don't count
-    assert.strictEqual(change("{'x': '9007199254740993', // 1e400\n key9007199254740993: 1}"), null);
+test('JSON5 converts to plain JSON keeping every value exactly', () => {
+    const json = (text) => JsonFormats.toPlainJson(text, 'json5', 0);
+    assert.strictEqual(json("{a: 0x1F, b: 'x', c: [.5, 5., +1, -.5e3,],}"), '{"a":31,"b":"x","c":[0.5,5,1,-0.5e3]}');
+    // Too long or too large for JavaScript, negative zero, and hex past 2^53
+    assert.strictEqual(json('[9007199254740993, 1e400, -0.0, 0x20000000000001]'), '[9007199254740993,1e400,-0.0,9007199254740993]');
+    // Repeated keys and key order
+    assert.strictEqual(json('{b: 1, a: 1, a: 2}'), '{"b":1,"a":1,"a":2}');
+    // Names that look like other things, and quotes and escapes in strings
+    assert.strictEqual(json(`{Infinity: 1, true: 2, $_x9: "it's", 'say "hi"': '\x41'}`), '{"Infinity":1,"true":2,"$_x9":"it\'s","say \\"hi\\"":"A"}');
 });
 
-test('JSON5 converts to plain JSON when its numbers survive', () => {
-    assert.strictEqual(JsonFormats.toPlainJson("{a: 0x1F, b: 'x', c: [.5,],}", 'json5', 0), '{"a":31,"b":"x","c":[0.5]}');
+test('JSON5 comments end at every line terminator', () => {
+    for (const code of [0x0d, 0x2028, 0x2029]) {
+        const text = '{// note' + String.fromCharCode(code) + ' a: 9007199254740993 /* 1e400 */}';
+        assert.strictEqual(JsonFormats.toPlainJson(text, 'json5', 0), '{"a":9007199254740993}');
+    }
 });

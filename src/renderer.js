@@ -360,11 +360,17 @@ class JSONViewer {
                 window.nativeAPI.openReleasesPage();
                 return;
             }
-            // Installing closes JSONinja, so unsaved changes come first
-            if (!(await this.settleUnsaved())) return;
             installBtn.disabled = true;
             text.textContent = `Downloading JSONinja ${update.version}...`;
-            const result = await window.nativeAPI.installUpdate();
+            let result = await window.nativeAPI.downloadUpdate();
+            // Installing closes JSONinja, so unsaved changes come first,
+            // including anything edited during the download
+            if (result.success && !(await this.settleUnsaved())) {
+                text.textContent = `JSONinja ${update.version} is ready to install.`;
+                installBtn.disabled = false;
+                return;
+            }
+            if (result.success) result = await window.nativeAPI.installUpdate();
             if (!result.success) {
                 text.textContent = `Update failed: ${result.error}`;
                 installBtn.disabled = false;
@@ -1693,11 +1699,6 @@ class JSONViewer {
             alert('This JSON5 document contains NaN or Infinity, which plain JSON can\'t represent, so it can\'t be formatted or minified without changing those values.');
             return false;
         }
-        const change = tab.format === 'json5' && JsonFormats.json5NumberChange(tab.content);
-        if (change) {
-            alert(`This JSON5 document contains the number ${change.written}, which would become ${change.becomes} in plain JSON, so it can't be formatted or minified without changing it.`);
-            return false;
-        }
         if (tab.format === 'jsonc' || tab.format === 'json5') {
             return await confirm(`This turns the ${JsonFormats.LABELS[tab.format]} document into plain JSON, which removes its comments. Continue?`);
         }
@@ -1827,6 +1828,8 @@ class JSONViewer {
                 this.switchToTab(tab.id);
                 if (!(await this.saveTab(tab))) return false;
             }
+            // A tab that wasn't in the list may have been edited while saving
+            return this.settleUnsaved();
         }
         return true;
     }
@@ -2765,6 +2768,7 @@ class JSONViewer {
         if (!window.nativeAPI) return;
 
         try {
+            const before = tab.content;
             const result = await window.nativeAPI.reloadWithEncoding({ filePath: tab.filePath, encoding });
             if (!result.success) {
                 alert(`Failed to reload with ${encoding} encoding: ${result.error}`);
@@ -2772,6 +2776,9 @@ class JSONViewer {
             }
             // The tab may have been closed or edited in the meantime
             if (!this.tabs.includes(tab)) return;
+            // Edited, and maybe saved, during the read: the file may have
+            // changed too, so read it again
+            if (tab.content !== before) return this.reloadWithEncoding(tab, encoding);
             if (tab.dirty && !(await confirm(`Reloading "${tab.baseTitle}" discards its unsaved changes. Reload anyway?`))) return;
 
             // Set before loading, so the first render shows the right banner

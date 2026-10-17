@@ -585,8 +585,13 @@ async fn save_file_as(
 }
 
 #[tauri::command]
+async fn download_update(app: AppHandle) -> Result<(), String> {
+    updates::download(app).await
+}
+
+#[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
-    updates::install(app).await
+    updates::install(&app)
 }
 
 #[tauri::command]
@@ -621,6 +626,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .manage(updates::Downloaded::default())
         .setup(|app| {
             let handle = app.handle();
             if let Some(window) = app.get_webview_window("main") {
@@ -656,6 +662,7 @@ fn main() {
             save_file_as,
             load_settings,
             save_settings,
+            download_update,
             install_update,
             dismiss_update,
             open_releases_page

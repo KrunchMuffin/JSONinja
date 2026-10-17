@@ -74,13 +74,12 @@ test('Format and Minify keep numbers JavaScript cannot hold exactly', async () =
     assert.strictEqual(tab.content, '{"id":9007199254740993,"big":1e400}');
 });
 
-test('Format refuses a JSON5 number that would change', async () => {
-    const { viewer, dialogs } = await viewerWith();
-    const tab = await openFile(viewer, '/data/n.json5', '{id: 9007199254740993}');
-    await viewer.formatCurrentTab();
-    assert.strictEqual(tab.content, '{id: 9007199254740993}');
-    assert.strictEqual(tab.dirty, false);
-    assert.match(dialogs.at(-1).alert, /9007199254740993.*9007199254740992/);
+test('Format converts JSON5 keeping its numbers and repeated keys', async () => {
+    const { viewer, answers } = await viewerWith();
+    const tab = await openFile(viewer, '/data/n.json5', '{id: 9007199254740993, id: 0x1F, // note\n}');
+    answers.confirm = true; // removing the comment
+    await viewer.minifyCurrentTab();
+    assert.strictEqual(tab.content, '{"id":9007199254740993,"id":31}');
 });
 
 test('an encoding reload updates the tab it came from, even after switching tabs', async () => {
@@ -194,11 +193,63 @@ test('closing the window stays open if a tab is edited while it saves', async ()
     assert.ok(!calls.some((call) => call.name === 'quit'));
 });
 
-test('installing an update offers to save unsaved changes first', async () => {
-    const { viewer, calls } = await viewerWith({ confirmClose: async () => 'cancel' });
-    viewer.markDirty(await openFile(viewer, '/data/a.json', '{}'));
-    assert.strictEqual(await viewer.settleUnsaved(), false);
+test('an encoding reload reads again if the tab changed during the read', async () => {
+    let reads = 0;
+    let tab;
+    const { viewer } = await viewerWith({
+        reloadWithEncoding: async () => {
+            reads++;
+            // The first time, the tab is edited and saved while the file is read
+            if (reads === 1) tab.content = '{"saved":"meanwhile"}';
+            return { success: true, content: reads === 1 ? '{"stale":1}' : '{"saved":"meanwhile"}', fileName: 'a.json' };
+        }
+    });
+    tab = await openFile(viewer, '/data/a.json', '{}');
+    await viewer.reloadWithEncoding(tab, 'latin1');
+    assert.strictEqual(reads, 2);
+    assert.strictEqual(tab.content, '{"saved":"meanwhile"}');
+});
+
+test('closing the window asks again about a tab edited while others saved', async () => {
+    let other;
+    const asked = [];
+    const { viewer, calls } = await viewerWith({
+        confirmClose: async (names) => {
+            asked.push([...names]);
+            return asked.length === 1 ? 'save' : 'cancel';
+        },
+        saveFile: async () => {
+            other.content = '{"typed":"during the save"}';
+            viewer.markDirty(other);
+            return { success: true };
+        }
+    });
+    const first = await openFile(viewer, '/data/a.json', '{}');
+    other = await openFile(viewer, '/data/b.json', '{}');
+    viewer.markDirty(first);
+    await viewer.confirmQuit();
+    assert.deepStrictEqual(asked, [['a.json'], ['b.json']]);
+    assert.ok(!calls.some((call) => call.name === 'quit'));
+});
+
+test('installing an update settles edits made during the download', async () => {
+    let tab;
+    const { viewer, calls, byId } = await viewerWith({
+        downloadUpdate: async () => {
+            viewer.markDirty(tab);
+            return { success: true };
+        },
+        confirmClose: async () => 'cancel'
+    });
+    tab = await openFile(viewer, '/data/a.json', '{}');
+    let install;
+    byId('updateInstallBtn').addEventListener = (type, listener) => { install = listener; };
+    viewer.bindUpdateBanner();
+    const announce = calls.filter((call) => call.name === 'onUpdateAvailable').at(-1).args[0];
+    announce(null, { version: '9.9.9', canInstall: true });
+    await install();
     assert.ok(calls.some((call) => call.name === 'confirmClose'));
+    assert.ok(!calls.some((call) => call.name === 'installUpdate'));
 });
 
 test('closing the window can discard unsaved changes', async () => {
