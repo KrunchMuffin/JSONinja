@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- 📦 **Updated Tauri and its plugins** - Now on Tauri 2.12.5, with all other dependencies at their latest compatible versions
+
+### Fixed
+- 📂 **Opening a file with JSONinja already running** - On Windows, a second copy could occasionally fail to close after handing its file to the running one
+- 🔄 **Linux AppImage updates** - Installing an update no longer fails when the temp folder is on a separate mount, and a download that isn't an AppImage is refused before anything is replaced
+- 🔐 **Stricter update checks** - Update signatures are checked more strictly, and a failed Windows installer launch reports the real reason, such as declining the permission prompt
+
 ## [2.5.2] - 2026-10-16
 
 ### Fixed
