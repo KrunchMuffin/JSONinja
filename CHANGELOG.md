@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.5] - 2026-11-01
+
 ### Fixed
 - 📂 **Opening a collapsed section keeps what's inside it collapsed** - After **Collapse All**, opening a section showed everything in it while the sections inside were still marked closed. Now only its direct contents appear, and search opens just the sections around a match
 - 🗂️ **Collapsing on large files** - On files over 5,000 lines, **Collapse All** did nothing, and on files over 50,000 lines collapsed sections came back as soon as you scrolled. Both now work like any other file. Each tab also now remembers its own collapsed sections instead of passing them on to other tabs
