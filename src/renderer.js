@@ -563,6 +563,7 @@ class JSONViewer {
 
     // Update the updateContentUI method to include word wrap class
     updateContentUI() {
+        this.virtualView = null;
         this.updateStatusBar();
 
         const tabContent = document.getElementById('tabContent');
@@ -670,10 +671,12 @@ class JSONViewer {
             const lines = jsonText.split('\n');
             const CHUNK_SIZE = 1000;
             let currentIndex = 0;
+            let hiddenLines = new Uint8Array(0);
 
             // Build collapsible regions and bracket levels once
             if (lines.length > 0) {
-                this.collapsibleRegions = this.buildCollapsibleMap(lines);
+                this.prepareRegions(lines, activeTab);
+                hiddenLines = this.hiddenLineFlags(lines.length);
                 this.lineMeta = this.buildLineMeta(activeTab.jsonData, lines.length);
                 if (this.settings.behavior.rainbowBrackets) {
                     this.bracketLevels = this.calculateBracketLevels(lines);
@@ -691,27 +694,31 @@ class JSONViewer {
                     const lineNumber = i + 1;
                     const line = lines[i];
                     
+                    const isHidden = hiddenLines[lineNumber] === 1;
+                    const isCollapsible = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
+                    const isCollapsed = isCollapsible && isCollapsible.collapsed;
+                    const stateClasses = `${isHidden ? ' json-line-hidden' : ''}${isCollapsed ? ' collapsed-region' : ''}`;
+
                     // Create line element
                     const lineDiv = document.createElement('div');
-                    lineDiv.className = 'json-line';
+                    lineDiv.className = `json-line${stateClasses}`;
                     lineDiv.setAttribute('data-line', lineNumber);
                     lineDiv.innerHTML = this.highlightJsonLine(line, lineNumber);
                     fragment.appendChild(lineDiv);
-                    
+
                     // Create line number element with toggle if needed
-                    const isCollapsible = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
                     if (isCollapsible) {
                         const lineNumDiv = document.createElement('div');
-                        lineNumDiv.className = 'line-number-with-toggle';
+                        lineNumDiv.className = `line-number-with-toggle${stateClasses}`;
                         lineNumDiv.setAttribute('data-line', lineNumber);
                         lineNumDiv.innerHTML = `
-                            <button class="gutter-toggle" data-line="${lineNumber}">▼</button>
+                            <button class="gutter-toggle" data-line="${lineNumber}">${isCollapsed ? '▶' : '▼'}</button>
                             <span class="line-num">${lineNumber}</span>
                         `;
                         lineNumberFragment.appendChild(lineNumDiv);
                     } else {
                         const lineNumDiv = document.createElement('div');
-                        lineNumDiv.className = 'line-number';
+                        lineNumDiv.className = `line-number${stateClasses}`;
                         lineNumDiv.setAttribute('data-line', lineNumber);
                         lineNumDiv.innerHTML = `<span class="line-num">${lineNumber}</span>`;
                         lineNumberFragment.appendChild(lineNumDiv);
@@ -803,7 +810,7 @@ class JSONViewer {
             console.log(`Line height calculated: ${LINE_HEIGHT}px (font: ${fontSize}px, ratio: ${lineHeightRatio})`);
             
             // Build collapsible regions and bracket levels once
-            this.collapsibleRegions = this.buildCollapsibleMap(lines);
+            this.prepareRegions(lines, activeTab);
             this.lineMeta = this.buildLineMeta(activeTab.jsonData, lines.length);
             if (this.settings.behavior.rainbowBrackets) {
                 this.bracketLevels = this.calculateBracketLevels(lines);
@@ -819,12 +826,13 @@ class JSONViewer {
 
             // Create viewport container with correct height
             const viewport = document.createElement('div');
-            // Use the last non-empty line to calculate height
-            const actualContentLines = lastNonEmptyLine;
-            const totalHeight = actualContentLines * LINE_HEIGHT;
-            viewport.style.height = `${totalHeight}px`;
+            // Scrolling works in rows of lines that aren't inside a closed region
+            let shownLines = this.shownLineNumbers(lastNonEmptyLine);
+            const setViewportHeight = () => {
+                viewport.style.height = `${shownLines.length * LINE_HEIGHT}px`;
+            };
+            setViewportHeight();
             viewport.style.position = 'relative';
-            console.log(`Viewport height: ${totalHeight}px for ${actualContentLines} content lines`);
 
             // Create content container that will hold visible lines
             const jsonContent = document.createElement('div');
@@ -856,12 +864,12 @@ class JSONViewer {
                     const viewportHeight = viewer.clientHeight;
                     
                     // Calculate visible range with some buffer
-                    const startLine = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - 10);
+                    const startRow = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - 10);
                     const visibleLines = Math.ceil(viewportHeight / LINE_HEIGHT) + 20; // Add buffer
-                    const endLine = Math.min(startLine + visibleLines, lastNonEmptyLine);
+                    const endRow = Math.min(startRow + visibleLines, shownLines.length);
                     
                     // Don't render beyond actual content
-                    if (startLine >= lastNonEmptyLine) {
+                    if (startRow >= shownLines.length) {
                         return;
                     }
 
@@ -870,20 +878,23 @@ class JSONViewer {
                     lineNumbersDiv.innerHTML = '';
 
                     // Set position based on scroll
-                    jsonContent.style.top = `${startLine * LINE_HEIGHT}px`;
-                    lineNumbersDiv.style.top = `${startLine * LINE_HEIGHT}px`;
+                    jsonContent.style.top = `${startRow * LINE_HEIGHT}px`;
+                    lineNumbersDiv.style.top = `${startRow * LINE_HEIGHT}px`;
 
                     // Render visible lines
                     const fragment = document.createDocumentFragment();
                     const lineNumberFragment = document.createDocumentFragment();
 
-                    for (let i = startLine; i < endLine; i++) {
-                        const lineNumber = i + 1;
-                        const line = lines[i];
+                    for (let row = startRow; row < endRow; row++) {
+                        const lineNumber = shownLines[row];
+                        const line = lines[lineNumber - 1];
+                        const isCollapsible = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
+                        const isCollapsed = isCollapsible && isCollapsible.collapsed;
+                        const collapsedClass = isCollapsed ? ' collapsed-region' : '';
 
                         // Create line element
                         const lineDiv = document.createElement('div');
-                        lineDiv.className = 'json-line';
+                        lineDiv.className = `json-line${collapsedClass}`;
                         lineDiv.setAttribute('data-line', lineNumber);
                         lineDiv.style.height = `${LINE_HEIGHT}px`;
                         lineDiv.style.lineHeight = `${LINE_HEIGHT}px`;
@@ -893,14 +904,13 @@ class JSONViewer {
                         fragment.appendChild(lineDiv);
 
                         // Create line number element
-                        const isCollapsible = this.collapsibleRegions && this.collapsibleRegions[lineNumber];
                         if (isCollapsible) {
                             const lineNumDiv = document.createElement('div');
-                            lineNumDiv.className = 'line-number-with-toggle';
+                            lineNumDiv.className = `line-number-with-toggle${collapsedClass}`;
                             lineNumDiv.setAttribute('data-line', lineNumber);
                             lineNumDiv.style.height = `${LINE_HEIGHT}px`;
                             lineNumDiv.innerHTML = `
-                                <button class="gutter-toggle" data-line="${lineNumber}">▼</button>
+                                <button class="gutter-toggle" data-line="${lineNumber}">${isCollapsed ? '▶' : '▼'}</button>
                                 <span class="line-num">${lineNumber}</span>
                             `;
                             lineNumberFragment.appendChild(lineNumDiv);
@@ -922,6 +932,18 @@ class JSONViewer {
 
             // Set up scroll listener
             viewer.addEventListener('scroll', renderVisibleLines);
+
+            // Opening or closing a region changes which lines there are to scroll through
+            if (this.getActiveTab() === activeTab) {
+                this.virtualView = {
+                    refresh: () => {
+                        shownLines = this.shownLineNumbers(lastNonEmptyLine);
+                        setViewportHeight();
+                        renderVisibleLines();
+                    },
+                    rowOfLine: (lineNumber) => this.rowOfLine(shownLines, lineNumber)
+                };
+            }
 
             // Assemble the viewer
             lineNumbersContainer.appendChild(lineNumbersDiv);
@@ -958,17 +980,8 @@ class JSONViewer {
         
         
         // Build map of collapsible regions (preserve existing state)
-        const newRegions = this.buildCollapsibleMap(lines);
+        this.prepareRegions(lines);
         this.lineMeta = this.buildLineMeta(data, lines.length);
-        if (this.collapsibleRegions) {
-            // Preserve collapsed state from existing regions
-            Object.keys(newRegions).forEach(lineNumber => {
-                if (this.collapsibleRegions[lineNumber]) {
-                    newRegions[lineNumber].collapsed = this.collapsibleRegions[lineNumber].collapsed;
-                }
-            });
-        }
-        this.collapsibleRegions = newRegions;
         
         // Calculate bracket levels for rainbow brackets
         if (this.settings.behavior.rainbowBrackets) {
@@ -2200,6 +2213,72 @@ class JSONViewer {
         });
     }
 
+    // The lines an opened region reveals. Regions closed inside it stay closed,
+    // so only their first line appears.
+    linesToShow(region) {
+        const lines = [];
+        for (let i = region.startLine + 1; i <= region.endLine; i++) {
+            lines.push(i);
+            const nested = this.collapsibleRegions[i];
+            if (nested && nested.collapsed) i = nested.endLine;
+        }
+        return lines;
+    }
+
+    // Which lines closed regions hide, indexed by line number
+    hiddenLineFlags(lineCount) {
+        const hidden = new Uint8Array(lineCount + 2);
+        let hiddenUntil = 0;
+        for (let line = 1; line <= lineCount; line++) {
+            if (line <= hiddenUntil) {
+                hidden[line] = 1;
+                continue;
+            }
+            const region = this.collapsibleRegions[line];
+            if (region && region.collapsed) hiddenUntil = region.endLine;
+        }
+        return hidden;
+    }
+
+    // The line numbers left once closed regions are taken out, in order
+    shownLineNumbers(lineCount) {
+        const hidden = this.hiddenLineFlags(lineCount);
+        const shown = new Int32Array(lineCount);
+        let count = 0;
+        for (let line = 1; line <= lineCount; line++) {
+            if (!hidden[line]) shown[count++] = line;
+        }
+        return shown.subarray(0, count);
+    }
+
+    // Where a line sits among the shown lines
+    rowOfLine(shownLines, lineNumber) {
+        let low = 0;
+        let high = shownLines.length - 1;
+        while (low < high) {
+            const middle = (low + high) >> 1;
+            if (shownLines[middle] < lineNumber) low = middle + 1;
+            else high = middle;
+        }
+        return low;
+    }
+
+    // Builds the regions for a document's lines. Which ones are closed belongs
+    // to that tab's document, so it doesn't carry over to other tabs or files.
+    prepareRegions(lines, tab = this.getActiveTab()) {
+        const regions = this.buildCollapsibleMap(lines);
+        if (tab) {
+            if (tab.regions && tab.regionsFor === tab.jsonData) {
+                Object.keys(regions).forEach(lineNumber => {
+                    if (tab.regions[lineNumber]) regions[lineNumber].collapsed = tab.regions[lineNumber].collapsed;
+                });
+            }
+            tab.regions = regions;
+            tab.regionsFor = tab.jsonData;
+        }
+        this.collapsibleRegions = regions;
+    }
+
     toggleRegion(lineNumber) {
         if (!this.collapsibleRegions || !this.collapsibleRegions[lineNumber]) {
             return;
@@ -2214,6 +2293,12 @@ class JSONViewer {
     }
     
     updateCollapsedRegion(lineNumber, region) {
+        // Very large files only draw the lines on screen, so they redraw instead
+        if (this.virtualView) {
+            this.virtualView.refresh();
+            return;
+        }
+
         // Update the toggle button icon
         const toggleButton = document.querySelector(`button.gutter-toggle[data-line="${lineNumber}"]`);
         if (toggleButton) {
@@ -2264,7 +2349,7 @@ class JSONViewer {
             if (lineNumberDiv) lineNumberDiv.classList.remove('collapsed-region');
             
             // Show lines in the expanded region
-            for (let i = region.startLine + 1; i <= region.endLine; i++) {
+            for (const i of this.linesToShow(region)) {
                 const showLine = document.querySelector(`.json-line[data-line="${i}"]`);
                 const showLineNumber = document.querySelector(`.line-number[data-line="${i}"], .line-number-with-toggle[data-line="${i}"]`);
                 if (showLine) showLine.classList.remove('json-line-hidden');
@@ -2573,17 +2658,11 @@ class JSONViewer {
         const lineNumber = result.lineNumber;
         
         // Expand any collapsed regions that contain this result
-        const wasExpanded = this.expandToShowLine(lineNumber);
+        const opened = this.expandToShowLine(lineNumber);
         
-        // If we expanded a region, we need to update the DOM
-        if (wasExpanded) {
-            // Update collapsed regions in DOM without full re-render
-            Object.keys(this.collapsibleRegions).forEach(startLine => {
-                const region = this.collapsibleRegions[startLine];
-                this.updateCollapsedRegion(parseInt(startLine), region);
-            });
-        }
-        
+        // Update the regions it opened in the DOM without full re-render
+        opened.forEach(region => this.updateCollapsedRegion(region.startLine, region));
+
         // Use setTimeout to ensure DOM updates are complete
         setTimeout(() => {
             // Check if we're in virtual scroll mode
@@ -2596,7 +2675,8 @@ class JSONViewer {
                 const LINE_HEIGHT = Math.ceil(fontSize * lineHeightRatio);
                 
                 // Calculate target scroll position (center the line in viewport)
-                const targetScrollTop = (lineNumber - 1) * LINE_HEIGHT - (viewer.clientHeight / 2) + (LINE_HEIGHT / 2);
+                const row = this.virtualView ? this.virtualView.rowOfLine(lineNumber) : lineNumber - 1;
+                const targetScrollTop = row * LINE_HEIGHT - (viewer.clientHeight / 2) + (LINE_HEIGHT / 2);
                 viewer.scrollTop = Math.max(0, targetScrollTop);
                 
                 // Wait for virtual scroll to render the line
@@ -2660,18 +2740,18 @@ class JSONViewer {
     }
     
     expandToShowLine(targetLine) {
-        // Expand any collapsed regions that contain this line
-        let expanded = false;
+        // Expand any collapsed regions that contain this line, and return them
+        const opened = [];
         Object.keys(this.collapsibleRegions).forEach(startLine => {
             const region = this.collapsibleRegions[startLine];
             if (region.collapsed && 
                 targetLine > parseInt(startLine) && 
                 targetLine <= region.endLine) {
                 region.collapsed = false;
-                expanded = true;
+                opened.push(region);
             }
         });
-        return expanded;
+        return opened;
     }
 
 
