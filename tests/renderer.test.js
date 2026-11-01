@@ -350,3 +350,83 @@ test('both status bar settings default to on, including for saved settings from 
     assert.strictEqual(viewer.settings.behavior.showPathDisplay, true);
     assert.strictEqual(viewer.settings.behavior.showLineNumbers, false);
 });
+
+// { a: { b: { c: 1 }, d: 2 }, e: [ 3 ] } as displayed:
+// 1 {  2 "a": {  3 "b": {  4 "c": 1  5 },  6 "d": 2  7 },  8 "e": [  9 3  10 ]  11 }
+const NESTED_LINES = JSON.stringify({ a: { b: { c: 1 }, d: 2 }, e: [3] }, null, 2).split('\n');
+
+test('opening a region keeps the regions closed inside it closed', async () => {
+    const { viewer } = await viewerWith();
+    viewer.collapsibleRegions = viewer.buildCollapsibleMap(NESTED_LINES);
+    const regions = viewer.collapsibleRegions;
+    Object.values(regions).forEach(region => { region.collapsed = true; });
+
+    assert.deepStrictEqual([...viewer.linesToShow(regions[1])], [2, 8, 11]);
+    assert.deepStrictEqual([...viewer.linesToShow(regions[2])], [3, 6, 7]);
+
+    regions[2].collapsed = false;
+    assert.deepStrictEqual([...viewer.linesToShow(regions[1])], [2, 3, 6, 7, 8, 11]);
+});
+
+test('hidden lines follow the outermost closed region', async () => {
+    const { viewer } = await viewerWith();
+    viewer.collapsibleRegions = viewer.buildCollapsibleMap(NESTED_LINES);
+    const hiddenLines = () => [...viewer.hiddenLineFlags(NESTED_LINES.length)]
+        .flatMap((flag, line) => (flag ? [line] : []));
+    assert.deepStrictEqual(hiddenLines(), []);
+
+    viewer.collapsibleRegions[3].collapsed = true;
+    assert.deepStrictEqual(hiddenLines(), [4, 5]);
+
+    viewer.collapsibleRegions[2].collapsed = true;
+    assert.deepStrictEqual(hiddenLines(), [3, 4, 5, 6, 7]);
+});
+
+test('closed regions belong to their own tab and document', async () => {
+    const { viewer } = await viewerWith();
+    const lines = ['{', '  "a": {', '    "b": 1', '  }', '}'];
+    const first = await openFile(viewer, '/data/a.json', '{"a":{"b":1}}');
+    viewer.prepareRegions(lines);
+    viewer.collapsibleRegions[2].collapsed = true;
+
+    viewer.prepareRegions(lines);
+    assert.strictEqual(viewer.collapsibleRegions[2].collapsed, true, 'kept on redraw');
+
+    await openFile(viewer, '/data/b.json', '{"a":{"b":1}}');
+    viewer.prepareRegions(lines);
+    assert.strictEqual(viewer.collapsibleRegions[2].collapsed, false, 'not carried to another tab');
+
+    viewer.switchToTab(first.id);
+    viewer.prepareRegions(lines);
+    assert.strictEqual(viewer.collapsibleRegions[2].collapsed, true, 'still closed back on its tab');
+
+    first.jsonData = { a: { b: 2 } };
+    viewer.prepareRegions(lines);
+    assert.strictEqual(viewer.collapsibleRegions[2].collapsed, false, 'not carried to a new document');
+});
+
+test('search reports only the closed regions around its match', async () => {
+    const { viewer } = await viewerWith();
+    viewer.collapsibleRegions = viewer.buildCollapsibleMap(NESTED_LINES);
+    const regions = viewer.collapsibleRegions;
+    regions[2].collapsed = true;
+    regions[8].collapsed = true;
+
+    const opened = viewer.expandToShowLine(4);
+    assert.deepStrictEqual([...opened], [regions[2]]);
+    assert.strictEqual(regions[8].collapsed, true);
+    assert.strictEqual(viewer.expandToShowLine(4).length, 0);
+});
+
+test('very large files scroll through the lines left after folding', async () => {
+    const { viewer } = await viewerWith();
+    viewer.collapsibleRegions = viewer.buildCollapsibleMap(NESTED_LINES);
+    viewer.collapsibleRegions[3].collapsed = true;
+    viewer.collapsibleRegions[8].collapsed = true;
+
+    const shown = viewer.shownLineNumbers(NESTED_LINES.length);
+    assert.deepStrictEqual([...shown], [1, 2, 3, 6, 7, 8, 11]);
+    assert.strictEqual(viewer.rowOfLine(shown, 1), 0);
+    assert.strictEqual(viewer.rowOfLine(shown, 6), 3);
+    assert.strictEqual(viewer.rowOfLine(shown, 11), 6);
+});
