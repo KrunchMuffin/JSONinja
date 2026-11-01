@@ -17,6 +17,7 @@ Website: [jsoninja.dabworx.com](https://jsoninja.dabworx.com)
 - **Format & Minify** - Pretty-print or minify JSON with one click. Only the spacing changes, so long numbers like `9007199254740993` are kept exactly
 - **Search & Navigation** - Powerful search with key/value filtering and highlighting
 - **Tree View** - Collapsible JSON structure with state-preserving expand/collapse controls
+- **Stats and Paths** - See a document's size and counts at a glance, and copy the path of any line
 - **Array Index Display** - Shows `[0]`, `[1]`, `[2]` indices for easy array navigation (toggleable)
 - **String Length Badges** - Character count display for long strings with configurable threshold
 - **Full-Screen Mode** - Distraction-free viewing with F11 toggle
@@ -189,8 +190,8 @@ Find a value only where it appears under certain keys, anywhere in the file:
 - **Collapse All** - Ctrl+Shift+E collapses everything
 - **Array Indices** - Toggle `[0]`, `[1]`, `[2]` display for arrays (default: on)
 - **String Length** - Show character count for long strings with configurable threshold
-- ~~**Stats Bar**~~ - *Coming back soon!*
-- ~~**Path Display**~~ - *Coming back soon!*
+- **Stats Bar** - Shows the document's lines, keys, objects, arrays, values, nesting depth and file size below the viewer (toggle in Quick Settings)
+- **Path Display** - Click a line to see its path, like `$.users[0].name`, then click the path to copy it (toggle in Quick Settings)
 - **Rainbow Brackets** - Color-coded bracket nesting with 8-color cycle
 - **Full Screen** - F11 for distraction-free viewing
 - **Line Numbers** - Toggle in quick settings

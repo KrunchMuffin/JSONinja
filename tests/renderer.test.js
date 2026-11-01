@@ -259,3 +259,94 @@ test('closing the window can discard unsaved changes', async () => {
     assert.ok(!calls.some((call) => call.name === 'saveFile'));
     assert.ok(calls.some((call) => call.name === 'quit'));
 });
+
+test('the path of each displayed line follows the formatted document', async () => {
+    const { viewer } = await viewerWith();
+    const data = { users: [{ name: 'Maya', tags: [] }, 7], 'odd key': { 'a"b': null }, empty: {} };
+    const lines = JSON.stringify(data, null, 2).split('\n');
+    const expected = {
+        '"users": [': '$.users',
+        '"name": "Maya",': '$.users[0].name',
+        '"tags": []': '$.users[0].tags',
+        '7': '$.users[1]',
+        '"odd key": {': '$["odd key"]',
+        '"a\\"b": null': '$["odd key"]["a\\"b"]',
+        '"empty": {}': '$.empty'
+    };
+    lines.forEach((line, i) => {
+        const want = expected[line.trim()] ?? expected[line.trim().replace(/,$/, '')];
+        if (want) assert.strictEqual(viewer.pathForLine(data, i + 1), want, line);
+    });
+    assert.strictEqual(viewer.pathForLine(data, 1), '$');
+    // A closing bracket belongs to its container, and nothing is past the end
+    assert.strictEqual(viewer.pathForLine(data, lines.indexOf('  ],') + 1), '$.users');
+    assert.strictEqual(viewer.pathForLine(data, lines.length), '$');
+    assert.strictEqual(viewer.pathForLine(data, lines.length + 1), null);
+});
+
+test('stats count what the document holds', async () => {
+    const { viewer } = await viewerWith();
+    const data = { a: 1, b: [true, null, { c: 'x' }], d: {} };
+    const stats = viewer.jsonStats(data);
+    assert.strictEqual(stats.lines, JSON.stringify(data, null, 2).split('\n').length);
+    assert.strictEqual(stats.keys, 4);
+    assert.strictEqual(stats.objects, 3);
+    assert.strictEqual(stats.arrays, 1);
+    assert.strictEqual(stats.values, 4);
+    assert.strictEqual(stats.depth, 3);
+    assert.strictEqual(viewer.jsonStats([]).depth, 1);
+});
+
+test('file sizes read naturally', async () => {
+    const { viewer } = await viewerWith();
+    assert.strictEqual(viewer.formatBytes(512), '512 B');
+    assert.strictEqual(viewer.formatBytes(1536), '1.5 KB');
+    assert.strictEqual(viewer.formatBytes(5 * 1024 * 1024), '5.0 MB');
+});
+
+test('the status bar shows the document and forgets the line when it changes', async () => {
+    const { viewer, byId } = await viewerWith();
+    const tab = await openFile(viewer, '/data/a.json', '{"a":{"b":1}}');
+    viewer.updateStatusBar();
+    assert.strictEqual(byId('statusBar').hidden, false);
+    assert.match(byId('statusBarStats').textContent, /2 keys/);
+    assert.match(byId('statusBarStats').textContent, /13 B/);
+    assert.strictEqual(byId('statusBarPathText').textContent, 'Click a line to see its path');
+
+    viewer.selectLine(tab, 3);
+    assert.strictEqual(tab.selectedLine, 3);
+    assert.strictEqual(byId('statusBarPathText').textContent, '$.a.b');
+
+    tab.jsonData = { other: true };
+    viewer.updateStatusBar();
+    assert.strictEqual(tab.selectedLine, null);
+    assert.strictEqual(byId('statusBarPathText').textContent, 'Click a line to see its path');
+});
+
+test('the status bar follows its settings and hides while editing', async () => {
+    const { viewer, byId } = await viewerWith();
+    const tab = await openFile(viewer, '/data/a.json', '{"a":1}');
+    viewer.settings.behavior.showStatsBar = false;
+    viewer.updateStatusBar();
+    assert.strictEqual(byId('statusBarStats').hidden, true);
+    assert.strictEqual(byId('statusBarPath').hidden, false);
+
+    viewer.settings.behavior.showPathDisplay = false;
+    viewer.updateStatusBar();
+    assert.strictEqual(byId('statusBar').hidden, true);
+
+    viewer.settings.behavior.showStatsBar = true;
+    viewer.settings.behavior.showPathDisplay = true;
+    tab.editing = true;
+    viewer.updateStatusBar();
+    assert.strictEqual(byId('statusBar').hidden, true);
+});
+
+test('both status bar settings default to on, including for saved settings from before', async () => {
+    const { viewer } = await viewerWith({
+        loadSettings: async () => ({ success: true, settings: { behavior: { showLineNumbers: false } } })
+    });
+    assert.strictEqual(viewer.settings.behavior.showStatsBar, true);
+    assert.strictEqual(viewer.settings.behavior.showPathDisplay, true);
+    assert.strictEqual(viewer.settings.behavior.showLineNumbers, false);
+});
