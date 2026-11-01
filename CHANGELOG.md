@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.5.3] - 2026-10-31
+### Added
+- 📊 **Stats Bar** - A bar below the viewer shows the document's lines, keys, objects, arrays, values, nesting depth and file size. Turn it off under Quick Settings
+- 📍 **Path Display** - Click a line to see its path, like `$.users[0].name`, and click the path to copy it. Turn it off under Quick Settings
+
+### Changed
+- 📦 **Includes the changes listed under 2.5.3** - That build was withdrawn before most people received it
+
+## [2.5.3] - 2026-10-31 (withdrawn)
 
 ### Changed
 - 📦 **Updated Tauri and its plugins** - Now on Tauri 2.12.5, with all other dependencies at their latest compatible versions

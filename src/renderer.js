@@ -73,7 +73,9 @@ class JSONViewer {
                 showArrayIndices: true,   // Show [0], [1] indices for array items
                 stringLengthThreshold: 20, // Character threshold for showing length badges
                 indentSize: 2,  // Number of spaces for JSON indentation
-                showWhitespace: false  // Show whitespace characters like spaces and tabs
+                showWhitespace: false,  // Show whitespace characters like spaces and tabs
+                showStatsBar: true,  // Show the document's size and counts below the viewer
+                showPathDisplay: true  // Show the path of the clicked line below the viewer
             }
         };
     }
@@ -273,6 +275,28 @@ class JSONViewer {
             this.updateActiveTabViewPreservingState(); // Re-render to show/hide whitespace
             this.updateSettingsUI(); // Sync with settings panel
         });
+
+        // Stats Bar and Path Display (sidebar)
+        document.getElementById('showStatsBar').addEventListener('change', (e) => {
+            this.settings.behavior.showStatsBar = e.target.checked;
+            this.updateStatusBar();
+        });
+        document.getElementById('showPathDisplay').addEventListener('change', (e) => {
+            this.settings.behavior.showPathDisplay = e.target.checked;
+            this.updateStatusBar();
+            this.markSelectedLine();
+        });
+
+        // Clicking a line shows its path; dragging to select text doesn't
+        document.getElementById('tabContent').addEventListener('click', (e) => {
+            const line = e.target.closest('.json-line');
+            const tab = this.getActiveTab();
+            if (!line || !tab || !tab.jsonData) return;
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed) return;
+            this.selectLine(tab, parseInt(line.getAttribute('data-line'), 10));
+        });
+        document.getElementById('statusBarPath').addEventListener('click', () => this.copySelectedPath());
 
         // Array Indices (settings panel)
         document.getElementById('showArrayIndices').addEventListener('change', (e) => {
@@ -539,6 +563,8 @@ class JSONViewer {
 
     // Update the updateContentUI method to include word wrap class
     updateContentUI() {
+        this.updateStatusBar();
+
         const tabContent = document.getElementById('tabContent');
         tabContent.innerHTML = '';
 
@@ -587,6 +613,7 @@ class JSONViewer {
         }
 
         tabContent.appendChild(contentDiv);
+        this.markSelectedLine();
     }
 
     renderNormalJSON(activeTab, contentDiv) {
@@ -721,8 +748,9 @@ class JSONViewer {
                     statusDiv.className = `status-indicator ${activeTab.isValid ? 'status-valid' : 'status-invalid'}`;
                     statusDiv.textContent = activeTab.isValid ? 'Valid JSON' : 'Invalid JSON';
                     viewer.appendChild(statusDiv);
-                    
+
                     contentDiv.appendChild(viewer);
+                    this.markSelectedLine();
                 }
             };
             
@@ -888,6 +916,7 @@ class JSONViewer {
 
                     jsonContent.appendChild(fragment);
                     lineNumbersDiv.appendChild(lineNumberFragment);
+                    this.markSelectedLine();
                 }, 10); // Small debounce
             };
 
@@ -1220,6 +1249,131 @@ class JSONViewer {
         };
         walk(data, -1);
         return { index, length };
+    }
+
+    // What the stats bar reports. Walks the data the same way it's displayed,
+    // one line per value plus a closing bracket for anything non-empty.
+    jsonStats(data) {
+        const stats = { lines: 0, keys: 0, objects: 0, arrays: 0, values: 0, depth: 0 };
+        const walk = (value, depth) => {
+            stats.lines++;
+            if (value === null || typeof value !== 'object') {
+                stats.values++;
+                return;
+            }
+            stats.depth = Math.max(stats.depth, depth);
+            const isArray = Array.isArray(value);
+            if (isArray) stats.arrays++;
+            else stats.objects++;
+            const children = isArray ? value : Object.values(value);
+            if (!isArray) stats.keys += children.length;
+            if (children.length === 0) return;
+            for (const child of children) walk(child, depth + 1);
+            stats.lines++; // the closing bracket
+        };
+        walk(data, 1);
+        return stats;
+    }
+
+    formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    // The JSONPath of a displayed line, or null past the end of the document.
+    // A closing bracket belongs to its container. Found by walking on each
+    // click, so large files don't keep a path for every line in memory.
+    pathForLine(data, target) {
+        const parts = ['$'];
+        let line = 0;
+        const walk = (value) => {
+            if (++line === target) return true;
+            if (value === null || typeof value !== 'object') return false;
+            const isArray = Array.isArray(value);
+            const keys = isArray ? value.keys() : Object.keys(value);
+            let empty = true;
+            for (const key of keys) {
+                empty = false;
+                parts.push(isArray ? `[${key}]`
+                    : /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`);
+                if (walk(value[key])) return true;
+                parts.pop();
+            }
+            return !empty && ++line === target;
+        };
+        return walk(data) ? parts.join('') : null;
+    }
+
+    updateStatusBar() {
+        const bar = document.getElementById('statusBar');
+        const tab = this.getActiveTab();
+        const { showStatsBar, showPathDisplay } = this.settings.behavior;
+        if (!tab || tab.editing || !tab.jsonData || (!showStatsBar && !showPathDisplay)) {
+            bar.hidden = true;
+            return;
+        }
+
+        // Counted once per document, and a line number means nothing in a new one
+        if (tab.statsFor !== tab.jsonData) {
+            tab.statsFor = tab.jsonData;
+            tab.stats = this.jsonStats(tab.jsonData);
+            tab.selectedLine = null;
+        }
+
+        bar.hidden = false;
+        document.getElementById('statusBarPath').hidden = !showPathDisplay;
+        const statsElement = document.getElementById('statusBarStats');
+        statsElement.hidden = !showStatsBar;
+        if (showStatsBar) {
+            const { lines, keys, objects, arrays, values, depth } = tab.stats;
+            const count = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+            const parts = [count(lines, 'line'), count(keys, 'key'), count(objects, 'object'),
+                count(arrays, 'array'), count(values, 'value'), `depth ${depth.toLocaleString()}`];
+            if (tab.content != null) parts.push(this.formatBytes(new Blob([tab.content]).size));
+            statsElement.textContent = parts.join(' · ');
+        }
+        this.showSelectedPath(tab);
+    }
+
+    showSelectedPath(tab) {
+        const path = tab.selectedLine ? this.pathForLine(tab.jsonData, tab.selectedLine) : null;
+        tab.selectedPath = path;
+        document.getElementById('statusBarPathText').textContent = path || 'Click a line to see its path';
+        const button = document.getElementById('statusBarPath');
+        button.disabled = !path;
+        button.title = path ? 'Copy this path' : '';
+    }
+
+    selectLine(tab, lineNumber) {
+        tab.selectedLine = lineNumber;
+        this.showSelectedPath(tab);
+        this.markSelectedLine();
+    }
+
+    // Lines are redrawn when scrolling very large files, so this runs after each draw
+    markSelectedLine() {
+        const tab = this.getActiveTab();
+        const previous = document.querySelector('.json-line.selected-line');
+        if (previous) previous.classList.remove('selected-line');
+        if (!tab || !tab.selectedLine || !this.settings.behavior.showPathDisplay) return;
+        const line = document.querySelector(`.json-line[data-line="${tab.selectedLine}"]`);
+        if (line) line.classList.add('selected-line');
+    }
+
+    async copySelectedPath() {
+        const tab = this.getActiveTab();
+        if (!tab || !tab.selectedPath) return;
+        const text = document.getElementById('statusBarPathText');
+        try {
+            await navigator.clipboard.writeText(tab.selectedPath);
+            text.textContent = 'Copied';
+        } catch (error) {
+            text.textContent = "Couldn't copy the path";
+        }
+        setTimeout(() => {
+            if (this.getActiveTab() === tab) this.showSelectedPath(tab);
+        }, 1200);
     }
 
     // Adds the "[0]" array index before a line's value and the "(42 chars)"
@@ -2570,6 +2724,8 @@ class JSONViewer {
         document.getElementById('highlightMatches').checked = this.settings.behavior.highlightMatches;
         document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
         document.getElementById('showWhitespace').checked = this.settings.behavior.showWhitespace;
+        document.getElementById('showStatsBar').checked = this.settings.behavior.showStatsBar;
+        document.getElementById('showPathDisplay').checked = this.settings.behavior.showPathDisplay;
 
         // Sync settings panel checkboxes
         const settingsArrayIndices = document.getElementById('showArrayIndices');
@@ -2680,7 +2836,10 @@ class JSONViewer {
         // Update behavior-related UI elements
         document.getElementById('showLineNumbers').checked = this.settings.behavior.showLineNumbers;
         document.getElementById('rainbowBrackets').checked = this.settings.behavior.rainbowBrackets;
+        document.getElementById('showStatsBar').checked = this.settings.behavior.showStatsBar;
+        document.getElementById('showPathDisplay').checked = this.settings.behavior.showPathDisplay;
 
+        this.updateStatusBar();
         this.updateActiveTabView();
     }
 

@@ -89,6 +89,12 @@
                     <label>
                         <input type="checkbox" id="showWhitespace"> Show Whitespace
                     </label>
+                    <label>
+                        <input type="checkbox" id="showStatsBar" checked> Stats Bar
+                    </label>
+                    <label>
+                        <input type="checkbox" id="showPathDisplay" checked> Path Display
+                    </label>
                 </div>
             </aside>
 
@@ -108,6 +114,14 @@
                         <button class="btn-secondary" id="welcomePasteBtn">Paste
                             JSON</button>
                     </div>
+                </div>
+
+                <!-- Path of the clicked line, and the document's size and counts -->
+                <div class="status-bar" id="statusBar" hidden>
+                    <button class="status-bar-path" id="statusBarPath" type="button" disabled>
+                        <span id="statusBarPathText"></span>
+                    </button>
+                    <span class="status-bar-stats" id="statusBarStats"></span>
                 </div>
             </section>
         </main>
