@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration "installer". SignPath keeps its own copy:
+  paste this into the project and keep the two in step.
+
+  release.yml uploads the NSIS installer as a bare file (archive: false), so
+  the root element is the installer itself, not a zip. Tauri's NSIS script
+  writes ProductName and ProductVersion into the installer, which the metadata
+  restrictions check.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <pe-file path="JSONinja_${version}_x64-setup.exe" product-name="JSONinja" product-version="${version}">
+    <authenticode-sign />
+  </pe-file>
+</artifact-configuration>
