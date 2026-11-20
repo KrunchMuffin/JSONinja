@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.6] - 2026-11-20
+
+### Changed
+- 🔏 **Signed Windows downloads** - The Windows installer and portable exe are now signed by DAB Worx Inc., so Windows names the publisher instead of warning about an unknown one. SmartScreen can still warn at first while the new signature builds up a reputation
+
 ## [2.5.5] - 2026-11-01
 
 ### Fixed
