@@ -82,14 +82,9 @@ Get the latest version from the **[Releases page](../../releases/latest)**:
 
 [View All Releases](../../releases) | [Report Issues](../../issues)
 
-### Code signing policy
+### Privacy
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). The Windows installer and portable exe are signed. Only builds made by GitHub Actions from this repository are signed, and each release is approved by hand.
-
-- Committers and reviewers: [KrunchMuffin](https://github.com/KrunchMuffin)
-- Approvers: [KrunchMuffin](https://github.com/KrunchMuffin)
-
-**Privacy:** JSONinja sends nothing about you or your files anywhere. Its only connection is to GitHub, to check for a new version when it starts; you can turn this off in the Help menu. Details are in the [privacy policy](https://jsoninja.dabworx.com/#privacy).
+JSONinja sends nothing about you or your files anywhere. Its only connection is to GitHub, to check for a new version when it starts; you can turn this off in the Help menu. Details are in the [privacy policy](https://jsoninja.dabworx.com/#privacy).
 
 ## Building from Source
 
