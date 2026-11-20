@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration "app-exes". SignPath keeps its own copy:
+  paste this into the project and keep the two in step.
+
+  release.yml uploads both copies of the app in one zip, so one approval
+  covers them: jsoninja.exe (the portable build) and jsoninja-nsis.exe (the
+  copy marked for the installer by set-bundle-type.js).
+
+  product-name and product-version are the metadata restrictions SignPath
+  Foundation requires: a file is refused unless its version resource says
+  JSONinja and matches the version the workflow passes in.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="jsoninja.exe" product-name="JSONinja" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="jsoninja-nsis.exe" product-name="JSONinja" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

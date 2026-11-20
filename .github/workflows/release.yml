@@ -140,11 +140,163 @@ jobs:
       - name: Upload Windows portable exe
         if: matrix.platform == 'windows-latest'
         shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Read version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app
+        run: npx tauri build --no-bundle --ci
+
+      # Two copies of the app: the portable exe as built, and the installer's copy
+      # marked as an NSIS install. Tauri would mark it while packaging, which would
+      # break the signature, so it is marked before signing (see set-bundle-type.js).
+      - name: Prepare the exes for signing
+        run: |
+          mkdir unsigned-exes
+          cp src-tauri/target/release/jsoninja.exe unsigned-exes/jsoninja.exe
+          node .github/scripts/set-bundle-type.js src-tauri/target/release/jsoninja.exe unsigned-exes/jsoninja-nsis.exe
+
+      - name: Upload unsigned exes
+        id: unsigned-exes
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-exes
+          path: unsigned-exes/
+          overwrite: true
+
+      - name: Sign the exes
+        uses: signpath/github-action-submit-signing-request@4a84eb4ad763290f059275786f2deed97c2c672b # v3.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: app-exes
+          github-artifact-id: ${{ steps.unsigned-exes.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: signed-exes
+
+      - name: Check the exe signatures
+        shell: pwsh
+        run: |
+          foreach ($file in 'signed-exes/jsoninja.exe', 'signed-exes/jsoninja-nsis.exe') {
+            $sig = Get-AuthenticodeSignature $file
+            if ($sig.Status -ne 'Valid') { throw "$file signature is $($sig.Status)" }
+            "$file signed by $($sig.SignerCertificate.Subject)"
+          }
+
+      # The installer packages whatever exe is in target/release, so swap in the
+      # signed NSIS copy and tell Tauri not to edit it
+      - name: Package the installer
+        run: |
+          cp signed-exes/jsoninja-nsis.exe src-tauri/target/release/jsoninja.exe
+          npx tauri bundle --bundles nsis --no-binary-patching --ci
+
+      - name: Upload unsigned installer
+        id: unsigned-installer
+        uses: actions/upload-artifact@v7
+        with:
+          path: src-tauri/target/release/bundle/nsis/JSONinja_${{ steps.version.outputs.version }}_x64-setup.exe
+          archive: false
+          overwrite: true
+
+      - name: Sign the installer
+        uses: signpath/github-action-submit-signing-request@4a84eb4ad763290f059275786f2deed97c2c672b # v3.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: signed-installer
+          skip-decompress: true
+
+      - name: Check the installer signature
+        shell: pwsh
+        run: |
+          $file = "signed-installer/JSONinja_${{ steps.version.outputs.version }}_x64-setup.exe"
+          $sig = Get-AuthenticodeSignature $file
+          if ($sig.Status -ne 'Valid') { throw "installer signature is $($sig.Status)" }
+          $sig.SignerCertificate.Subject
+
+      # Made after Authenticode signing: the updater checks the exact bytes it downloads
+      - name: Sign the installer for the updater
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri signer sign "signed-installer/JSONinja_${{ steps.version.outputs.version }}_x64-setup.exe"
+
+      # The bare exe runs without installing, so ship it as the portable build
+      - name: Upload to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
           PORTABLE="JSONinja-Portable-v${VERSION}-x64.exe"
           cp src-tauri/target/release/jsoninja.exe "$PORTABLE"
           pwsh -NoProfile -File packaging/windows/sign.ps1 "$PORTABLE"
           gh release upload "${{ needs.create-release.outputs.tag }}" "$PORTABLE" --clobber
+
+  # tauri-action writes latest.json for macOS and Linux. Add the Windows entries
+  # once both jobs are done, in the same form tauri-action uses.
+  updater-manifest:
+    needs: [create-release, build, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add Windows to latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          VERSION="${{ needs.create-release.outputs.tag }}"
+          VERSION="${VERSION#v}"
+          INSTALLER="JSONinja_${VERSION}_x64-setup.exe"
+          asset_id() {
+            gh api --paginate "repos/$REPO/releases/$RELEASE_ID/assets" --jq ".[] | select(.name == \"$1\") | .id"
+          }
+          download() {
+            gh api -H "Accept: application/octet-stream" "repos/$REPO/releases/assets/$1"
+          }
+          MANIFEST_ID=$(asset_id latest.json)
+          INSTALLER_ID=$(asset_id "$INSTALLER")
+          SIG_ID=$(asset_id "$INSTALLER.sig")
+          if [ -z "$MANIFEST_ID" ] || [ -z "$INSTALLER_ID" ] || [ -z "$SIG_ID" ]; then
+            echo "::error::Missing latest.json, the installer or its .sig on the release"
+            exit 1
+          fi
+          download "$MANIFEST_ID" > latest.json
+          download "$SIG_ID" > installer.sig
+          jq --rawfile sig installer.sig \
+             --arg url "https://api.github.com/repos/$REPO/releases/assets/$INSTALLER_ID" '
+            ($sig | rtrimstr("\n")) as $s
+            | .platforms["windows-x86_64"] = {signature: $s, url: $url}
+            | .platforms["windows-x86_64-nsis"] = {signature: $s, url: $url}
+          ' latest.json > latest.new.json
+          mv latest.new.json latest.json
+          jq '.platforms | keys' latest.json
+          gh release upload "${{ needs.create-release.outputs.tag }}" latest.json --clobber --repo "$REPO"
