@@ -237,7 +237,6 @@ h2 {
 @media (max-width: 760px) { .groups { grid-template-columns: 1fr; } }
 .group h3 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 3px solid var(--mask); display: inline-block; font-size: 1.25rem; font-variation-settings: "wdth" 85; }
 .group dl { margin: 0; }
-.group dl + h3 { margin-top: 40px; }
 .group dt { font-weight: 700; margin-top: 16px; }
 .group dd { margin: 2px 0 0; color: var(--ink-2); max-width: 62ch; }
 
@@ -466,40 +465,27 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 </table>
 <p class="fine">JSON files still opening in another app on Windows? Use <strong>File &gt; System Integration &gt; Make JSONinja the Default for JSON Files</strong> and pick JSONinja in Settings. If the app you picked before upgrading to Windows 11 25H2 keeps opening them, which is a known issue after that upgrade, click <strong>Reset</strong> at the bottom of Settings &gt; Apps &gt; Default apps and choose JSONinja again. That reset clears your other default apps too.</p>
 <p class="fine">Prefer to build it yourself? You need Node.js and Rust; the <a href="https://github.com/KrunchMuffin/JSONinja#building-from-source">README</a> has the steps.</p>
-<p class="fine">The Windows files are code-signed. See the <a href="#code-signing">code signing policy</a>.</p>
 </div>
 </section>
 
 <section class="block" id="code-signing" aria-labelledby="code-signing-h">
 <div class="wrap">
-<h2 id="code-signing-h">Code signing policy</h2>
-<p class="lede">Free code signing provided by <a href="https://signpath.io">SignPath.io</a>, certificate by <a href="https://signpath.org">SignPath Foundation</a>.</p>
+<h2 id="code-signing-h">Privacy and update security</h2>
 <div class="groups">
 <div class="group">
-<h3>What is signed</h3>
-<dl>
-<dt>Windows installer and portable exe</dt>
-<dd>Both are signed, so Windows shows SignPath Foundation as the publisher. GitHub Actions builds them from the <a href="https://github.com/KrunchMuffin/JSONinja">source on GitHub</a>, and nothing built anywhere else is signed.</dd>
-<dt>Every release is approved by hand</dt>
-<dd>Signing only happens after an approver checks the release and approves the request.</dd>
-<dt>macOS and Linux</dt>
-<dd>These builds aren't covered by this certificate. On every platform, updates are also signed with JSONinja's own update key, and the app refuses any update that isn't.</dd>
-</dl>
-</div>
-<div class="group">
-<h3>Team roles</h3>
-<dl>
-<dt>Committers and reviewers</dt>
-<dd><a href="https://github.com/KrunchMuffin">KrunchMuffin</a></dd>
-<dt>Approvers</dt>
-<dd><a href="https://github.com/KrunchMuffin">KrunchMuffin</a></dd>
-</dl>
 <h3 id="privacy">Privacy policy</h3>
 <dl>
 <dt>Your files stay on your computer</dt>
 <dd>JSONinja sends nothing about you or your files anywhere. Settings and the recent files list are stored only on your computer.</dd>
 <dt>The update check</dt>
 <dd>The only thing JSONinja connects to is GitHub, to check for a new version when it starts. GitHub sees your IP address, as it does for any download (see <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>). You can turn the check off in the Help menu.</dd>
+</dl>
+</div>
+<div class="group">
+<h3>Update verification</h3>
+<dl>
+<dt>App updates</dt>
+<dd>JSONinja verifies the digital signature on automatic updates before installing them. This is separate from Windows publisher signing for downloaded installers and executables.</dd>
 </dl>
 </div>
 </div>
@@ -525,7 +511,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
 <a href="https://github.com/KrunchMuffin/JSONinja/releases">Releases</a>
 <a href="https://github.com/KrunchMuffin/JSONinja/blob/main/CHANGELOG.md">Changelog</a>
 <a href="https://github.com/KrunchMuffin/JSONinja/issues">Report a bug</a>
-<a href="#code-signing">Code signing policy</a>
+<a href="#code-signing">Update security</a>
 <a href="#privacy">Privacy</a>
 </nav>
 </div>
