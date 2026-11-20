@@ -58,6 +58,10 @@ jobs:
           fi
           echo "id=${ID}" >> "$GITHUB_OUTPUT"
 
+  # The Windows files are signed with DAB Worx's Azure Artifact Signing certificate
+  # (packaging/windows/sign.ps1): Tauri signs the exe, the uninstaller and the installer through
+  # tauri.signing.conf.json, and the portable exe is signed below. Every run here is a release,
+  # so the Windows build stops if signing isn't set up (CONTRIBUTING.md, "Signing").
   build:
     needs: create-release
     strategy:
@@ -65,14 +69,40 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: ''
+            args: '--config src-tauri/tauri.signing.conf.json'
           - platform: macos-latest
             args: '--target universal-apple-darwin'
           - platform: ubuntu-22.04
             args: ''
     runs-on: ${{ matrix.platform }}
+    env:
+      # Read by sign.ps1 (through Azure's EnvironmentCredential) on Windows only, never printed
+      AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
+      AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+      AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
     steps:
       - uses: actions/checkout@v7
+
+      # Before the build, so a release that can't be signed stops at once
+      - name: Check signing
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          if (-not ($env:AZURE_TENANT_ID -and $env:AZURE_CLIENT_ID -and $env:AZURE_CLIENT_SECRET)) {
+            Write-Output '::error::The Azure signing secrets are missing (CONTRIBUTING.md, "Signing")'
+            exit 1
+          }
+          pwsh -NoProfile -File packaging/windows/sign.ps1 -Check
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output '::error::Signing is not set up (CONTRIBUTING.md, "Signing")'
+            exit 1
+          }
+
+      # Microsoft's ArtifactSigning module, which sign.ps1 uses, runs on .NET 8
+      - uses: actions/setup-dotnet@v6
+        if: matrix.platform == 'windows-latest'
+        with:
+          dotnet-version: 8.0.x
 
       - uses: actions/setup-node@v7
         with:
@@ -105,7 +135,8 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}
 
-      # The bare exe runs without installing, so ship it as the portable build
+      # The bare exe runs without installing, so ship it as the portable build. Tauri puts the
+      # unsigned exe back in target/release after packaging, so the copy is signed here.
       - name: Upload Windows portable exe
         if: matrix.platform == 'windows-latest'
         shell: bash
@@ -115,4 +146,5 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           PORTABLE="JSONinja-Portable-v${VERSION}-x64.exe"
           cp src-tauri/target/release/jsoninja.exe "$PORTABLE"
+          pwsh -NoProfile -File packaging/windows/sign.ps1 "$PORTABLE"
           gh release upload "${{ needs.create-release.outputs.tag }}" "$PORTABLE" --clobber

@@ -1,0 +1,5 @@
+{
+  "endpoint": "https://eus.codesigning.azure.net",
+  "account": "dabworx-signing-payg",
+  "profile": "DAB-Worx-Cert"
+}
