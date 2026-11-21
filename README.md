@@ -4,6 +4,24 @@ A fast, lightweight viewer for **JSON, JSON Lines, JSONC and JSON5**, built with
 
 Website: [jsoninja.dabworx.com](https://jsoninja.dabworx.com)
 
+<table>
+  <tr>
+    <th colspan="2" align="left">More apps from DAB Worx</th>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://bucketworx.com/?utm_source=github&utm_medium=readme&utm_campaign=jsoninja"><img src="https://dabworx.com/bucketworx-icon.webp" width="48" height="48" align="left" alt="BucketWorx icon"></a>
+      <strong><a href="https://bucketworx.com/?utm_source=github&utm_medium=readme&utm_campaign=jsoninja">BucketWorx</a></strong>, free public beta<br>
+      An S3 client for Windows, macOS and Linux. Manage buckets on Amazon S3, Cloudflare R2, Backblaze B2, Wasabi and MinIO from a desktop app, a CLI, or an MCP server for AI agents.
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://captureworx.app/?utm_source=github&utm_medium=readme&utm_campaign=jsoninja"><img src="https://dabworx.com/captureworx-icon.webp" width="48" height="48" align="left" alt="CaptureWorx icon"></a>
+      <strong><a href="https://captureworx.app/?utm_source=github&utm_medium=readme&utm_campaign=jsoninja">CaptureWorx</a></strong>, public beta<br>
+      A screenshot tool for Windows, macOS and Linux. Capture a region, a window or a whole scrolling page, mark it up with arrows, numbered steps and blur, then copy, save or share it.
+    </td>
+  </tr>
+</table>
+
 ## Features
 
 ### 🚀 Core Features
